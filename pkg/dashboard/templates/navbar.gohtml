@@ -1,0 +1,21 @@
+{{define "navbar"}}
+  <div class="navbar">
+    <div class="navbar-content">
+      <a href="/">
+        <img class="logo" src="static/images/polaris-logo.png" alt="Polaris" />
+      </a>
+      <div class="navbar-right">
+      </div>
+      {{ if and (not .Config.DisallowExemptions) (gt (len .Config.Exemptions) 0) }}
+      <div class="exemption-alert">
+        <i class="fas fa-exclamation"></i>
+        <span>
+          Some checks were skipped based on configured exemptions.
+          <a href="?disallowExemptions=true">Click here</a>
+          to view the report with these checks included.
+        </span>
+      </div>
+      {{ end }}
+    </div>
+  </div>
+{{end}}
