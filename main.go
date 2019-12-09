@@ -19,16 +19,15 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/service"
-	"io/ioutil"
-	"net/http"
-	"os"
-
 	conf "github.com/deepnetworkgmbh/security-monitor-scanners/pkg/config"
 	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/kube"
+	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/service"
 	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/validator"
 	"github.com/sirupsen/logrus"
+	"io/ioutil"
 	_ "k8s.io/client-go/plugin/pkg/client/auth" // Required for other auth providers like GKE.
+	"net/http"
+	"os"
 	"sigs.k8s.io/yaml"
 )
 
@@ -106,13 +105,14 @@ func main() {
 func startScannersServer(c conf.Configuration, auditPath string, port int, basePath string) {
 	var auditDataPtr *validator.AuditData
 	router := service.GetRouter(c, auditPath, port, basePath, auditDataPtr)
-	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("OK"))
-	})
-	http.Handle("/", router)
+
+	srv := &http.Server{
+		Handler: router,
+		Addr:    fmt.Sprintf(":%d", port),
+	}
 
 	logrus.Infof("Starting Scanners server on port %d", port)
-	logrus.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), nil))
+	logrus.Fatal(srv.ListenAndServe())
 }
 
 func runAndReportAudit(c conf.Configuration, auditPath string, outputFile string, outputURL string, outputFormat string) validator.AuditData {
