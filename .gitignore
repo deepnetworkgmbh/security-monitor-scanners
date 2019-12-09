@@ -4,9 +4,7 @@
 *.dll
 *.so
 *.dylib
-polaris
-
-!deploy/helm/polaris
+security-monitor-scanners
 
 # Test binary, build with `go test -c`
 *.test

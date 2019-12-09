@@ -19,21 +19,22 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"os"
+
 	conf "github.com/deepnetworkgmbh/security-monitor-scanners/pkg/config"
 	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/kube"
 	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/service"
 	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/validator"
 	"github.com/sirupsen/logrus"
-	"io/ioutil"
 	_ "k8s.io/client-go/plugin/pkg/client/auth" // Required for other auth providers like GKE.
-	"net/http"
-	"os"
 	"sigs.k8s.io/yaml"
 )
 
 const (
-	// Version represents the current release version of Polaris
-	Version = "0.5.2"
+	// Version represents the current release version of Scanners
+	Version = "0.1.0"
 )
 
 func main() {
@@ -50,15 +51,15 @@ func main() {
 	auditOutputFile := flag.String("output-file", "", "Destination file for audit results")
 	auditOutputFormat := flag.String("output-format", "json", "Output format for results - json, yaml, or score")
 	displayName := flag.String("display-name", "", "An optional identifier for the audit")
-	configPath := flag.String("config", "", "Location of Polaris configuration file")
-	disallowExemptions := flag.Bool("disallow-exemptions", false, "Location of Polaris configuration file")
+	configPath := flag.String("config", "", "Location of Scanners configuration file")
+	disallowExemptions := flag.Bool("disallow-exemptions", false, "Location of Scanners configuration file")
 	logLevel := flag.String("log-level", logrus.InfoLevel.String(), "Logrus log level")
-	version := flag.Bool("version", false, "Prints the version of Polaris")
+	version := flag.Bool("version", false, "Prints the version of Scanners")
 
 	flag.Parse()
 
 	if *version {
-		fmt.Printf("Polaris version %s\n", Version)
+		fmt.Printf("Scanners version %s\n", Version)
 		os.Exit(0)
 	}
 

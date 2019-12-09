@@ -125,7 +125,7 @@ metadata:
     app: scanners
 spec:
   ports:
-  - name: dashboard
+  - name: scanners
     port: 80
     protocol: TCP
     targetPort: main-http

@@ -1,7 +1,7 @@
 builds:
 - env:
   - CGO_ENABLED=0
-  binary: polaris
+  binary: security-monitor-scanners
 archive:
   replacements:
     darwin: Darwin
@@ -21,9 +21,9 @@ changelog:
     - '^test:'
 brew:
   github:
-    owner: FairwindsOps
+    owner: deepnetworkgmbh
     name: homebrew-tap
   folder: Formula
-  description: Open Source Best Practices for Kubernetes
+  description: Scanners/Auditors for Security Monitor
   test: |
-    system "#{bin}/polaris --version"
+    system "#{bin}/security-monitor-scanners --version"
