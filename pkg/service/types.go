@@ -1,44 +1,39 @@
-package dashboard
+package service
 
 import (
-	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/config"
-	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/validator"
 	"html/template"
 	"strings"
+
+	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/validator"
 )
 
 // templateData is passed to the dashboard HTML template
 type templateData struct {
-	BasePath  string
-	Config    config.Configuration
 	AuditData validator.AuditData
 	JSON      template.JS
 }
 
 // scanTemplateData is passed to the image-scan-details HTML template
 type scanTemplateData struct {
-	BasePath string
-	Config   config.Configuration
-	ImageTag string
-	ScanResult string
+	ImageTag    string
+	ScanResult  string
 	Description string
-	UsedIn []imageUsage
+	UsedIn      []imageUsage
 	ScanTargets []imageScanTarget
 }
 
 type imageUsage struct {
-
 }
 
 type imageScanTarget struct {
-	Name string
+	Name                  string
 	VulnerabilitiesGroups []vulnerabilitiesGroup
 }
 
 type vulnerabilitiesGroup struct {
 	Severity string
-	Count int
-	CVEs []cveDetails
+	Count    int
+	CVEs     []cveDetails
 }
 
 type cveDetails struct {

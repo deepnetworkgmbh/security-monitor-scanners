@@ -1,17 +1,18 @@
-package scanner
+package imagescanner
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
 	"net/url"
+
+	"github.com/sirupsen/logrus"
 )
 
-// Scanner base struct
-type Scanner struct {
+// ImageScanner base struct
+type ImageScanner struct {
 	ScannerURL string
 }
 
@@ -91,13 +92,13 @@ func (s *ImageScanResultSummary) GetScansMessage() string {
 	}
 }
 
-// NewScanner returns a new scanner instance.
-func NewScanner(url string) *Scanner {
-	return &Scanner{ScannerURL: url}
+// NewScanner returns a new image-scanner instance.
+func NewScanner(url string) *ImageScanner {
+	return &ImageScanner{ScannerURL: url}
 }
 
 // Scan all images
-func (s *Scanner) Scan(images []string) {
+func (s *ImageScanner) Scan(images []string) {
 	bytesRepresentation, err := json.Marshal(images)
 	scansURL := fmt.Sprintf("%s/scan/images", s.ScannerURL)
 
@@ -118,7 +119,7 @@ func (s *Scanner) Scan(images []string) {
 }
 
 // Get returns detailed single image scan result
-func (s *Scanner) Get(image string) (scanResult ImageScanResult, err error) {
+func (s *ImageScanner) Get(image string) (scanResult ImageScanResult, err error) {
 	scanResultURL := fmt.Sprintf("%s/scan-results/trivy/%s", s.ScannerURL, url.QueryEscape(image))
 
 	resp, err := http.Get(scanResultURL)
@@ -135,7 +136,7 @@ func (s *Scanner) Get(image string) (scanResult ImageScanResult, err error) {
 }
 
 // GetAll returns scan result summary for an array of images
-func (s *Scanner) GetAll(images []string) (scanResults []ImageScanResultSummary, err error) {
+func (s *ImageScanner) GetAll(images []string) (scanResults []ImageScanResultSummary, err error) {
 	getURL := fmt.Sprintf("%s/scan-results/trivy?", s.ScannerURL)
 
 	for _, image := range images {

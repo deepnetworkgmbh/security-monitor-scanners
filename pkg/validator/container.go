@@ -16,7 +16,7 @@ package validator
 
 import (
 	"fmt"
-	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/scanner"
+	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/imagescanner"
 	"strings"
 
 	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/config"
@@ -31,7 +31,7 @@ type ContainerValidation struct {
 	Container       *corev1.Container
 	IsInitContainer bool
 	parentPodSpec   corev1.PodSpec
-	ScanSummary     scanner.ImageScanResultSummary
+	ScanSummary     imagescanner.ImageScanResultSummary
 }
 
 // ValidateContainer validates that each pod conforms to the Polaris config, returns a ResourceResult.

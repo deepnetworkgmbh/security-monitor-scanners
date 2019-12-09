@@ -25,7 +25,7 @@ import (
 
 	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/config"
 	conf "github.com/deepnetworkgmbh/security-monitor-scanners/pkg/config"
-	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/scanner"
+	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/imagescanner"
 	corev1 "k8s.io/api/core/v1"
 	apiMachineryYAML "k8s.io/apimachinery/pkg/util/yaml"
 )
@@ -216,7 +216,7 @@ func (rs *ResultSummary) appendResults(toAppend ResultSummary) {
 }
 
 // ScansMap provides a map from image name to a scan result
-type ScansMap map[string]scanner.ImageScanResultSummary
+type ScansMap map[string]imagescanner.ImageScanResultSummary
 
 // ScansSummary provides a high level overview of container images scan results.
 type ScansSummary struct {
@@ -227,7 +227,7 @@ type ScansSummary struct {
 	Errors    uint
 }
 
-func (summary *ScansSummary) calculateResults(scans []scanner.ImageScanResultSummary) {
+func (summary *ScansSummary) calculateResults(scans []imagescanner.ImageScanResultSummary) {
 	summary.Scans = ScansMap{}
 
 	for _, scan := range scans {
@@ -268,7 +268,7 @@ type ContainerResult struct {
 	Image        string
 	Messages     []*ResultMessage
 	Summary      *ResultSummary
-	ScanSummary  scanner.ImageScanResultSummary
+	ScanSummary  imagescanner.ImageScanResultSummary
 }
 
 // PodResult provides a list of validation messages for each pod.

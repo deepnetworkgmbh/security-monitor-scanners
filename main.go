@@ -19,12 +19,12 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/service"
 	"io/ioutil"
 	"net/http"
 	"os"
 
 	conf "github.com/deepnetworkgmbh/security-monitor-scanners/pkg/config"
-	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/dashboard"
 	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/kube"
 	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/validator"
 	"github.com/sirupsen/logrus"
@@ -39,18 +39,17 @@ const (
 
 func main() {
 	// Load CLI Flags
-	// TODO: Split up global flags vs dashboard/audit specific flags
-	dashboard := flag.Bool("dashboard", false, "Runs the webserver for Polaris dashboard.")
+	// TODO: Split up global flags vs service/audit specific flags
+	service := flag.Bool("service", false, "Runs the webserver for Scanners service.")
 	audit := flag.Bool("audit", false, "Runs a one-time audit.")
 	auditPath := flag.String("audit-path", "", "If specified, audits one or more YAML files instead of a cluster")
 	setExitCode := flag.Bool("set-exit-code-on-error", false, "When running with --audit, set an exit code of 3 when the audit contains error-level issues.")
 	minScore := flag.Int("set-exit-code-below-score", 0, "When running with --audit, set an exit code of 4 when the score is below this threshold (1-100)")
-	dashboardPort := flag.Int("dashboard-port", 8080, "Port for the dashboard webserver")
-	dashboardBasePath := flag.String("dashboard-base-path", "/", "Path on which the dashboard is served")
+	servicePort := flag.Int("service-port", 8080, "Port for the Scanners webserver")
+	serviceBasePath := flag.String("service-base-path", "/", "Path on which the Scanners are served")
 	auditOutputURL := flag.String("output-url", "", "Destination URL to send audit results")
 	auditOutputFile := flag.String("output-file", "", "Destination file for audit results")
 	auditOutputFormat := flag.String("output-format", "json", "Output format for results - json, yaml, or score")
-	loadAuditFile := flag.String("load-audit-file", "", "Runs the dashboard with data saved from a past audit.")
 	displayName := flag.String("display-name", "", "An optional identifier for the audit")
 	configPath := flag.String("config", "", "Location of Polaris configuration file")
 	disallowExemptions := flag.Bool("disallow-exemptions", false, "Location of Polaris configuration file")
@@ -85,12 +84,12 @@ func main() {
 		c.DisallowExemptions = true
 	}
 
-	if !*dashboard && !*audit {
+	if !*service && !*audit {
 		*audit = true
 	}
 
-	if *dashboard {
-		startDashboardServer(c, *auditPath, *loadAuditFile, *dashboardPort, *dashboardBasePath)
+	if *service {
+		startScannersServer(c, *auditPath, *servicePort, *serviceBasePath)
 	} else if *audit {
 		auditData := runAndReportAudit(c, *auditPath, *auditOutputFile, *auditOutputURL, *auditOutputFormat)
 
@@ -104,19 +103,15 @@ func main() {
 	}
 }
 
-func startDashboardServer(c conf.Configuration, auditPath string, loadAuditFile string, port int, basePath string) {
+func startScannersServer(c conf.Configuration, auditPath string, port int, basePath string) {
 	var auditDataPtr *validator.AuditData
-	if loadAuditFile != "" {
-		auditData := validator.ReadAuditFromFile(loadAuditFile)
-		auditDataPtr = &auditData
-	}
-	router := dashboard.GetRouter(c, auditPath, port, basePath, auditDataPtr)
+	router := service.GetRouter(c, auditPath, port, basePath, auditDataPtr)
 	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("OK"))
 	})
 	http.Handle("/", router)
 
-	logrus.Infof("Starting Polaris dashboard server on port %d", port)
+	logrus.Infof("Starting Scanners server on port %d", port)
 	logrus.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), nil))
 }
 
