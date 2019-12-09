@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fairwindsops/polaris/test"
+	"github.com/deepnetworkgmbh/security-monitor-scanners/test"
 	"github.com/stretchr/testify/assert"
 )
 

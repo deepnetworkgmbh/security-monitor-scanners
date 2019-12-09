@@ -17,11 +17,11 @@ package validator
 import (
 	"testing"
 
-	conf "github.com/fairwindsops/polaris/pkg/config"
-	controller "github.com/fairwindsops/polaris/pkg/validator/controllers"
+	conf "github.com/deepnetworkgmbh/security-monitor-scanners/pkg/config"
+	controller "github.com/deepnetworkgmbh/security-monitor-scanners/pkg/validator/controllers"
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/fairwindsops/polaris/test"
+	"github.com/deepnetworkgmbh/security-monitor-scanners/test"
 	"github.com/stretchr/testify/assert"
 )
 

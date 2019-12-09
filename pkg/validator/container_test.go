@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"testing"
 
-	conf "github.com/fairwindsops/polaris/pkg/config"
+	conf "github.com/deepnetworkgmbh/security-monitor-scanners/pkg/config"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"

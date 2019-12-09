@@ -24,11 +24,11 @@ import (
 	"os"
 	"strings"
 
-	conf "github.com/fairwindsops/polaris/pkg/config"
-	"github.com/fairwindsops/polaris/pkg/dashboard"
-	"github.com/fairwindsops/polaris/pkg/kube"
-	"github.com/fairwindsops/polaris/pkg/validator"
-	fwebhook "github.com/fairwindsops/polaris/pkg/webhook"
+	conf "github.com/deepnetworkgmbh/security-monitor-scanners/pkg/config"
+	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/dashboard"
+	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/kube"
+	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/validator"
+	fwebhook "github.com/deepnetworkgmbh/security-monitor-scanners/pkg/webhook"
 	"github.com/sirupsen/logrus"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	_ "k8s.io/client-go/plugin/pkg/client/auth" // Required for other auth providers like GKE.

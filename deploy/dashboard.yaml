@@ -1,18 +1,10 @@
 ---
-# Source: polaris/templates/0-namespace.yaml
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: polaris
----
-# Source: polaris/templates/configmap.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: polaris
-  namespace: polaris
+  name: scanners
   labels:
-    app: polaris
+    app: scanners
 data:
   config.yaml:  |
     resources:
@@ -23,7 +15,7 @@ data:
     images:
       tagNotSpecified: error
       vulnerabilityScanFailed: warning
-      scannerUrl: http://kube-scanner
+      scannerUrl: http://image-scanner
     healthChecks:
       readinessProbeMissing: warning
       livenessProbeMissing: warning
@@ -68,21 +60,19 @@ data:
       - ReplicationControllers
   
 ---
-# Source: polaris/templates/dashboard.rbac.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: polaris-dashboard
-  namespace: polaris
+  name: scanners
   labels:
-    app: polaris
+    app: scanners
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRole
 metadata:
-  name: polaris-dashboard
+  name: scanners
   labels:
-    app: polaris
+    app: scanners
 rules:
   - apiGroups:
       - 'apps'
@@ -116,27 +106,23 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRoleBinding
 metadata:
-  name: polaris-dashboard
+  name: scanners
   labels:
-    app: polaris
+    app: scanners
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: polaris-dashboard
+  name: scanners
 subjects:
   - kind: ServiceAccount
-    name: polaris-dashboard
-    namespace: polaris
+    name: scanners
 ---
-# Source: polaris/templates/dashboard.service.yaml
 apiVersion: v1
 kind: Service
 metadata:
-  name: polaris-dashboard
-  namespace: polaris
+  name: scanners
   labels:
-    app: polaris
-  annotations:
+    app: scanners
 spec:
   ports:
   - name: dashboard
@@ -144,46 +130,37 @@ spec:
     protocol: TCP
     targetPort: main-http
   selector:
-    app: polaris
-    component: dashboard
+    app: scanners
   type: ClusterIP
 ---
-# Source: polaris/templates/dashboard.deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: polaris-dashboard
-  namespace: polaris
+  name: scanners
   labels:
-    app: polaris
-    component: dashboard
+    app: scanners
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: polaris
-      component: dashboard
+      app: scanners
   template:
     metadata:
-      annotations:
-        checksum/config: '8aa5a565fba7a2db98d46752087de8c1dcc83b70cd762c5829d5ba01270d54a2'
       labels:
-        app: polaris
-        component: dashboard
+        app: scanners
     spec:
       volumes:
       - name: config
         configMap:
-          name: polaris
+          name: scanners
       containers:
       - command:
-        - polaris
-        - --dashboard
+        - scanners
         - --config
         - /opt/app/config.yaml
-        image: 'quay.io/reactiveops/polaris:0.5'
+        image: 'deepnetwork/scanners:0.1.0'
         imagePullPolicy: 'Always'
-        name: dashboard
+        name: scanners
         ports:
         - name: main-http
           containerPort: 8080
@@ -219,7 +196,5 @@ spec:
           mountPath: /opt/app/config.yaml
           subPath: config.yaml
           readOnly: true
-      serviceAccountName: polaris-dashboard
-      nodeSelector:
-      tolerations:
+      serviceAccountName: scanners
 

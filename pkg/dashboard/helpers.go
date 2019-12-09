@@ -16,8 +16,8 @@ package dashboard
 
 import (
 	"fmt"
-	"github.com/fairwindsops/polaris/pkg/validator"
-	"github.com/fairwindsops/polaris/pkg/validator/messages"
+	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/validator"
+	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/validator/messages"
 
 	"net/url"
 	"strings"

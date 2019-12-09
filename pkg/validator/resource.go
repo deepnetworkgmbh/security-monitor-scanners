@@ -15,7 +15,7 @@
 package validator
 
 import (
-	conf "github.com/fairwindsops/polaris/pkg/config"
+	conf "github.com/deepnetworkgmbh/security-monitor-scanners/pkg/config"
 	"github.com/sirupsen/logrus"
 )
 

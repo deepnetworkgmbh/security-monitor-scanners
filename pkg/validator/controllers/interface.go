@@ -3,8 +3,8 @@ package controllers
 import (
 	"fmt"
 
-	"github.com/fairwindsops/polaris/pkg/config"
-	"github.com/fairwindsops/polaris/pkg/kube"
+	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/config"
+	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/kube"
 	kubeAPICoreV1 "k8s.io/api/core/v1"
 )
 

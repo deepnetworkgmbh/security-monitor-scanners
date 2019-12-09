@@ -1,26 +1,25 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: polaris-passing-deployment
+  name: scanners-passing-deployment
   labels:
-    app: polaris-passing-deployment
+    app: scanners-passing-deployment
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: polaris-passing-deployment
+      app: scanners-passing-deployment
   template:
     metadata:
       labels:
-        app: polaris-passing-deployment
+        app: scanners-passing-deployment
     spec:
       containers:
         - command:
-            - polaris
-            - --dashboard
-          image: 'quay.io/reactiveops/polaris:0.1.0'
+            - scanners
+          image: 'deepnetwork/scanners:0.1.0'
           imagePullPolicy: 'Always'
-          name: dashboard
+          name: scanners
           ports:
             - containerPort: 8080
           livenessProbe:

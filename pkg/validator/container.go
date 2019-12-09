@@ -16,11 +16,11 @@ package validator
 
 import (
 	"fmt"
-	"github.com/fairwindsops/polaris/pkg/scanner"
+	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/scanner"
 	"strings"
 
-	"github.com/fairwindsops/polaris/pkg/config"
-	"github.com/fairwindsops/polaris/pkg/validator/messages"
+	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/config"
+	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/validator/messages"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )

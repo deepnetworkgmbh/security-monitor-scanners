@@ -1,18 +1,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: polaris-failing-deployment
+  name: scanners-failing-deployment
   labels:
-    app: polaris-failing-deployment
+    app: scanners-failing-deployment
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: polaris-failing-deployment
+      app: scanners-failing-deployment
   template:
     metadata:
       labels:
-        app: polaris-failing-deployment
+        app: scanners-failing-deployment
     spec:
       containers:
       - name: this-will-fail

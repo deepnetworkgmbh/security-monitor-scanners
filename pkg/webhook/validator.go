@@ -20,9 +20,9 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/fairwindsops/polaris/pkg/config"
-	validator "github.com/fairwindsops/polaris/pkg/validator"
-	"github.com/fairwindsops/polaris/pkg/validator/controllers"
+	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/config"
+	validator "github.com/deepnetworkgmbh/security-monitor-scanners/pkg/validator"
+	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/validator/controllers"
 	"github.com/sirupsen/logrus"
 	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
