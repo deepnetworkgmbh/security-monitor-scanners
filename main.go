@@ -22,20 +22,13 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"strings"
 
 	conf "github.com/deepnetworkgmbh/security-monitor-scanners/pkg/config"
 	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/dashboard"
 	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/kube"
 	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/validator"
-	fwebhook "github.com/deepnetworkgmbh/security-monitor-scanners/pkg/webhook"
 	"github.com/sirupsen/logrus"
-	apitypes "k8s.io/apimachinery/pkg/types"
 	_ "k8s.io/client-go/plugin/pkg/client/auth" // Required for other auth providers like GKE.
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/yaml"
 )
 
@@ -46,16 +39,14 @@ const (
 
 func main() {
 	// Load CLI Flags
-	// TODO: Split up global flags vs dashboard/webhook/audit specific flags
+	// TODO: Split up global flags vs dashboard/audit specific flags
 	dashboard := flag.Bool("dashboard", false, "Runs the webserver for Polaris dashboard.")
-	webhook := flag.Bool("webhook", false, "Runs the webhook webserver.")
 	audit := flag.Bool("audit", false, "Runs a one-time audit.")
 	auditPath := flag.String("audit-path", "", "If specified, audits one or more YAML files instead of a cluster")
 	setExitCode := flag.Bool("set-exit-code-on-error", false, "When running with --audit, set an exit code of 3 when the audit contains error-level issues.")
 	minScore := flag.Int("set-exit-code-below-score", 0, "When running with --audit, set an exit code of 4 when the score is below this threshold (1-100)")
 	dashboardPort := flag.Int("dashboard-port", 8080, "Port for the dashboard webserver")
 	dashboardBasePath := flag.String("dashboard-base-path", "/", "Path on which the dashboard is served")
-	webhookPort := flag.Int("webhook-port", 9876, "Port for the webhook webserver")
 	auditOutputURL := flag.String("output-url", "", "Destination URL to send audit results")
 	auditOutputFile := flag.String("output-file", "", "Destination file for audit results")
 	auditOutputFormat := flag.String("output-format", "json", "Output format for results - json, yaml, or score")
@@ -65,8 +56,6 @@ func main() {
 	disallowExemptions := flag.Bool("disallow-exemptions", false, "Location of Polaris configuration file")
 	logLevel := flag.String("log-level", logrus.InfoLevel.String(), "Logrus log level")
 	version := flag.Bool("version", false, "Prints the version of Polaris")
-	disableWebhookConfigInstaller := flag.Bool("disable-webhook-config-installer", false,
-		"disable the installer in the webhook server, so it won't install webhook configuration resources during bootstrapping")
 
 	flag.Parse()
 
@@ -96,13 +85,11 @@ func main() {
 		c.DisallowExemptions = true
 	}
 
-	if !*dashboard && !*webhook && !*audit {
+	if !*dashboard && !*audit {
 		*audit = true
 	}
 
-	if *webhook {
-		startWebhookServer(c, *disableWebhookConfigInstaller, *webhookPort)
-	} else if *dashboard {
+	if *dashboard {
 		startDashboardServer(c, *auditPath, *loadAuditFile, *dashboardPort, *dashboardBasePath)
 	} else if *audit {
 		auditData := runAndReportAudit(c, *auditPath, *auditOutputFile, *auditOutputURL, *auditOutputFormat)
@@ -131,85 +118,6 @@ func startDashboardServer(c conf.Configuration, auditPath string, loadAuditFile 
 
 	logrus.Infof("Starting Polaris dashboard server on port %d", port)
 	logrus.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), nil))
-}
-
-func startWebhookServer(c conf.Configuration, disableWebhookConfigInstaller bool, port int) {
-	logrus.Debug("Setting up controller manager")
-	mgr, err := manager.New(config.GetConfigOrDie(), manager.Options{})
-	if err != nil {
-		logrus.Errorf("Unable to set up overall controller manager: %v", err)
-		os.Exit(1)
-	}
-
-	polarisAppName := "polaris"
-	polarisResourceName := "polaris-webhook"
-	polarisNamespaceBytes, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
-
-	if err != nil {
-		// Not exiting here as we have fallback options
-		logrus.Debugf("Error reading namespace information: %v", err)
-	}
-
-	polarisNamespace := string(polarisNamespaceBytes)
-	if polarisNamespace == "" {
-		polarisNamespace = polarisResourceName
-		logrus.Debugf("Could not determine current namespace, creating resources in %s namespace", polarisNamespace)
-	}
-
-	logrus.Info("Setting up webhook server")
-	as, err := webhook.NewServer(polarisResourceName, mgr, webhook.ServerOptions{
-		Port:                          int32(port),
-		CertDir:                       "/opt/cert",
-		DisableWebhookConfigInstaller: &disableWebhookConfigInstaller,
-		BootstrapOptions: &webhook.BootstrapOptions{
-			ValidatingWebhookConfigName: polarisResourceName,
-			Secret: &apitypes.NamespacedName{
-				Namespace: polarisNamespace,
-				Name:      polarisResourceName,
-			},
-
-			Service: &webhook.Service{
-				Namespace: polarisNamespace,
-				Name:      polarisResourceName,
-
-				// Selectors should select the pods that runs this webhook server.
-				Selectors: map[string]string{
-					"app":       polarisAppName,
-					"component": "webhook",
-				},
-			},
-		},
-	})
-
-	if err != nil {
-		logrus.Errorf("Error setting up webhook server: %v", err)
-		os.Exit(1)
-	}
-
-	logrus.Infof("Polaris webhook server listening on port %d", port)
-
-	// Iterate all the configurations supported controllers to scan and register them for webhooks
-	// Should only register controllers that are configured to be scanned
-	logrus.Debug("Registering webhooks to the webhook server")
-	var webhooks []webhook.Webhook
-	for index, controllerToScan := range c.ControllersToScan {
-		for innerIndex, supportedAPIType := range controllerToScan.ListSupportedAPIVersions() {
-			webhookName := strings.ToLower(fmt.Sprintf("%s-%d-%d", controllerToScan, index, innerIndex))
-			hook := fwebhook.NewWebhook(webhookName, mgr, fwebhook.Validator{Config: c}, supportedAPIType)
-			webhooks = append(webhooks, hook)
-		}
-	}
-
-	if err = as.Register(webhooks...); err != nil {
-		logrus.Debugf("Unable to register webhooks in the admission server: %v", err)
-		os.Exit(1)
-	}
-
-	logrus.Debug("Starting webhook manager")
-	if err := mgr.Start(signals.SetupSignalHandler()); err != nil {
-		logrus.Errorf("Error starting manager: %v", err)
-		os.Exit(1)
-	}
 }
 
 func runAndReportAudit(c conf.Configuration, auditPath string, outputFile string, outputURL string, outputFormat string) validator.AuditData {
