@@ -42,9 +42,9 @@ type k8sResource struct {
 	Kind string `yaml:"kind"`
 }
 
-func (rp *ResourceProvider) GetAllImageTags() []string {
+func GetAllImageTags(pods []corev1.Pod) []string {
 	set := make(map[string]bool)
-	for _, pod := range rp.Pods {
+	for _, pod := range pods {
 		for _, ic := range pod.Spec.InitContainers {
 			set[ic.Image] = true
 		}
@@ -138,6 +138,29 @@ func CreateResourceProviderFromCluster() (*ResourceProvider, error) {
 	return CreateResourceProviderFromAPI(api, kubeConf.Host)
 }
 
+// CreatePodsProviderFromCluster list of pods from a cluster
+func CreatePodsProviderFromCluster(namespaces ...string) ([]corev1.Pod, error) {
+	kubeConf, configError := config.GetConfig()
+	if configError != nil {
+		logrus.Errorf("Error fetching KubeConfig %v", configError)
+		return nil, configError
+	}
+	api, err := kubernetes.NewForConfig(kubeConf)
+	if err != nil {
+		logrus.Errorf("Error creating Kubernetes client %v", err)
+		return nil, err
+	}
+
+	listOpts := metav1.ListOptions{}
+	pods, err := api.CoreV1().Pods("").List(listOpts)
+	if err != nil {
+		logrus.Errorf("Error fetching Pods %v", err)
+		return nil, err
+	}
+
+	return filterPods(pods.Items, namespaces), nil
+}
+
 // CreateResourceProviderFromAPI creates a new ResourceProvider from an existing k8s interface
 func CreateResourceProviderFromAPI(kube kubernetes.Interface, clusterName string) (*ResourceProvider, error) {
 	listOpts := metav1.ListOptions{}
@@ -222,7 +245,7 @@ func (rp *ResourceProvider) FilterByNamespace(namespaces ...string) {
 	filterJobs(rp, namespaces)
 	filterCronJobs(rp, namespaces)
 	filterReplicationControllers(rp, namespaces)
-	filterPods(rp, namespaces)
+	rp.Pods = filterPods(rp.Pods, namespaces)
 }
 
 func addResourceFromString(contents string, resources *ResourceProvider) error {

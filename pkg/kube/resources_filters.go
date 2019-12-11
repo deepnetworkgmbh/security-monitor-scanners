@@ -112,17 +112,21 @@ func filterReplicationControllers(rp *ResourceProvider, namespaces []string) {
 	rp.ReplicationControllers = filtered
 }
 
-func filterPods(rp *ResourceProvider, namespaces []string) {
-	filtered := rp.Pods[:0]
-	for _, x := range rp.Pods {
+func filterPods(pods []corev1.Pod, namespaces []string) []corev1.Pod {
+	if len(namespaces) == 0 {
+		return pods
+	}
+
+	filtered := pods[:0]
+	for _, x := range pods {
 		for _, ns := range namespaces {
 			if x.Namespace == ns {
 				filtered = append(filtered, x)
 			}
 		}
 	}
-	for i := len(filtered); i < len(rp.Pods); i++ {
-		rp.Pods[i] = corev1.Pod{}
+	for i := len(filtered); i < len(pods); i++ {
+		pods[i] = corev1.Pod{}
 	}
-	rp.Pods = filtered
+	return filtered
 }

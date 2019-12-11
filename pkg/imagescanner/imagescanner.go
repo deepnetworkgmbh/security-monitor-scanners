@@ -143,7 +143,7 @@ func (s *ImageScanner) GetAll(images []string) (scanResults []ImageScanResultSum
 		getURL = fmt.Sprintf("%s&images=%s", getURL, url.QueryEscape(image))
 	}
 
-	scanRequestsURL := getURL[:len(getURL)-1]
+	scanRequestsURL := getURL[:len(getURL)]
 	resp, err := http.Get(scanRequestsURL)
 	if err != nil {
 		logrus.Errorf("Error requesting images scan results %v", err)

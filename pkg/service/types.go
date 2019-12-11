@@ -1,76 +1,113 @@
 package service
 
 import (
-	"html/template"
-	"strings"
-
-	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/validator"
+	"fmt"
+	scanner "github.com/deepnetworkgmbh/security-monitor-scanners/pkg/imagescanner"
+	corev1 "k8s.io/api/core/v1"
 )
 
-// templateData is passed to the dashboard HTML template
-type templateData struct {
-	AuditData validator.AuditData
-	JSON      template.JS
+// ImageScansSummary represents a summary of container images vulnerabilities audit
+type ImageScansSummary struct {
+	Images []ImageScanResult `json:"images"`
 }
 
-// scanTemplateData is passed to the image-scan-details HTML template
-type scanTemplateData struct {
-	ImageTag    string
-	ScanResult  string
-	Description string
-	UsedIn      []imageUsage
-	ScanTargets []imageScanTarget
+// ImageScanResult is a short description of a single container image vulnerabilities audit
+type ImageScanResult struct {
+	Image       string                  `json:"image"`
+	ScanResult  string                  `json:"scanResult"`
+	Description string                  `json:"description"`
+	Counters    []VulnerabilityCounter  `json:"counters"`
+	Attributes  []string                `json:"attributes"`
+	Pods        []string                `json:"pods"`
 }
 
-type imageUsage struct {
+// VulnerabilityCounter represents amount of issues with specified severity
+type VulnerabilityCounter struct {
+	Severity string `json:"severity"`
+	Count    int    `json:"count"`
 }
 
-type imageScanTarget struct {
-	Name                  string
-	VulnerabilitiesGroups []vulnerabilitiesGroup
-}
-
-type vulnerabilitiesGroup struct {
-	Severity string
-	Count    int
-	CVEs     []cveDetails
-}
-
-type cveDetails struct {
-	Id               string
-	PackageName      string
-	InstalledVersion string
-	FixedVersion     string
-	Title            string
-	Description      string
-	References       []string
-}
-
-type bySeverity []string
-
-func (s bySeverity) Len() int {
-	return len(s)
-}
-func (s bySeverity) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
-func (s bySeverity) Less(i, j int) bool {
-	return severityWeigh(s[i]) < severityWeigh(s[j])
-}
-
-func severityWeigh(s string) int {
-	switch strings.ToUpper(s) {
-	case "CRITICAL":
-		return 0
-	case "HIGH":
-		return 20
-	case "MEDIUM":
-		return 40
-	case "LOW":
-		return 60
-	case "UNKNOWN":
-		return 80
-	default:
-		return 1000
+func CreateImageScansSummary(pods []corev1.Pod, scans []scanner.ImageScanResultSummary) *ImageScansSummary {
+	summary := ImageScansSummary{
+		Images: make([]ImageScanResult, len(scans)),
 	}
+
+	imagesSet := make(map[string]imageAttrs, len(scans))
+
+	for i, scan := range scans {
+		// init map of images. Later it would be used to map pods and labels
+		imagesSet[scan.Image] = imageAttrs{
+			pods:   make(map[string]bool),
+			labels: make(map[string]bool),
+		}
+
+		summary.Images[i] = ImageScanResult{
+			Image:       scan.Image,
+			Description: scan.Description,
+			ScanResult:  scan.ScanResult,
+			Counters:    make([]VulnerabilityCounter, len(scan.Counters)),
+		}
+
+		for j, counter := range scan.Counters {
+			summary.Images[i].Counters[j] = VulnerabilityCounter{
+				Severity: counter.Severity,
+				Count:    counter.Count,
+			}
+		}
+	}
+
+	// maps pod metadata to image scan results
+	// if there is image scan result for container or init-container:
+	//  - attach pod labels and namespace to set of attrs
+	//  - add pod_full_name to set of pods
+	for _, pod := range pods {
+		for _, ic := range pod.Spec.InitContainers {
+			if img, ok := imagesSet[ic.Image]; ok {
+				enrichImageWithPodMetadata(&img, pod)
+			}
+		}
+		for _, c := range pod.Spec.Containers {
+			if img, ok := imagesSet[c.Image]; ok {
+				enrichImageWithPodMetadata(&img, pod)
+			}
+		}
+	}
+
+	// use index to mutate existing object
+	for i := range summary.Images {
+		summary.Images[i].Attributes = getStringsFromSet(imagesSet[summary.Images[i].Image].labels)
+		summary.Images[i].Pods = getStringsFromSet(imagesSet[summary.Images[i].Image].pods)
+	}
+
+	return &summary
+}
+
+type imageAttrs struct {
+	pods   map[string]bool
+	labels map[string]bool
+}
+
+func enrichImageWithPodMetadata(img *imageAttrs, pod corev1.Pod) {
+	podFullName := fmt.Sprintf("%s.%s", pod.Namespace, pod.Name)
+	img.pods[podFullName] = true
+
+	nsAttr := fmt.Sprintf("namespace:%s", pod.Namespace)
+	img.labels[nsAttr] = true
+
+	for k, v := range pod.Labels {
+		attr := fmt.Sprintf("%s:%s", k, v)
+		img.labels[attr] = true
+	}
+}
+
+func getStringsFromSet(set map[string]bool) []string{
+	i := 0
+	values := make([]string, len(set))
+
+	for k := range set {
+		values[i] = k
+		i++
+	}
+
+	return values
 }
