@@ -1,0 +1,53 @@
+---
+# Source: polaris/templates/namespace.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: polaris
+---
+# Source: polaris/templates/dashboard.deployment.yaml
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  annotations:
+    checksum/config: '5702aca235561630172c22b6b900f5cebd4e82fae60389df18a3537ff82e2f09'
+  name: polaris-dashboard
+  namespace: polaris
+  labels:
+    app: polaris
+    component: dashboard
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: polaris
+      component: dashboard
+  template:
+    metadata:
+      labels:
+        app: polaris
+        component: dashboard
+    spec:
+      containers:
+      - command:
+        - polaris
+        - --dashboard
+        image: 'quay.io/reactiveops/polaris:master'
+        imagePullPolicy: 'Always'
+        name: dashboard
+---
+# Source: polaris/templates/secret.yaml
+
+---
+# Source: polaris/templates/webhook.deployment.yaml
+
+---
+# Source: polaris/templates/webhook.service.yaml
+---
+# Source: polaris/templates/namespace.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: polaris-2
+---
+

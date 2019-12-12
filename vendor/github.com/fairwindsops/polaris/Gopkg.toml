@@ -54,5 +54,9 @@
   version = "1.7.1"
 
 [[constraint]]
-  name = "github.com/fairwindsops/polaris"
-  revision = "91378c3d920d8ac79b197cc44c171e50ac953d32"
+  revision = "772775880e1fbf39a7804149ed11c0f714ec89fe"
+  name = "gitlab.com/golang-commonmark/markdown"
+
+[[constraint]]
+  revision = "v1.3.1"
+  name = "github.com/golang/protobuf"

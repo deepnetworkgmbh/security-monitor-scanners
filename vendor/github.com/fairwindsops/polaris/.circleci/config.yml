@@ -1,0 +1,202 @@
+version: 2.1
+
+executors:
+  vm:
+    machine:
+      enabled: true
+
+references:
+  set_environment_variables: &set_environment_variables
+    run:
+      name: Set Environment Variables
+      command: |
+        echo 'export CI_SHA1=$CIRCLE_SHA1' >> ${BASH_ENV}
+        echo 'export CI_BRANCH=$CIRCLE_BRANCH' >> ${BASH_ENV}
+        echo 'export CI_BUILD_NUM=$CIRCLE_BUILD_NUM' >> ${BASH_ENV}
+        echo 'export CI_TAG=$CIRCLE_TAG' >> ${BASH_ENV}
+        echo 'export PUSH_ALL_VERSION_TAGS=true' >> ${BASH_ENV}
+  install_k8s: &install_k8s
+    run:
+      name: Install K8s
+      command: |
+        sudo apt-get update
+        echo "Installing git and jq"
+        sudo apt-get install -yqq jq git
+
+        echo "Installing KIND"
+        curl -sLO https://github.com/kubernetes-sigs/kind/releases/download/0.2.1/kind-linux-amd64
+        chmod 0755 kind-linux-amd64
+        sudo mv kind-linux-amd64 /usr/local/bin/kind
+        kind version
+
+        echo "Installing Kubectl"
+        curl -sLO https://storage.googleapis.com/kubernetes-release/release/v1.12.7/bin/linux/amd64/kubectl
+        chmod 0755 kubectl
+        sudo mv kubectl /usr/local/bin/
+        kubectl version --client
+
+
+        echo "Creating Kubernetes Cluster with Kind"
+        kind create cluster --wait=90s
+        docker ps -a
+
+        echo "Setting up kubecfg"
+        cp $(kind get kubeconfig-path --name=kind) ~/.kube/config
+        kubectl version
+
+  # Test scripts
+  update_coverage: &update_coverage
+    run:
+      name: Update Coverage
+      command: |
+        if [[ -z $CIRCLE_PR_NUMBER ]]; then
+          bash <(curl -s https://codecov.io/bash)
+        else
+          echo "Skipping coverage for forked PR"
+        fi
+  test_binary_dashboard: &test_binary_dashboard
+    run:
+      name: Test Dashboard
+      command: |
+        go run main.go --dashboard --dashboard-port 3000 --audit-path ./examples &
+        sleep 30
+        curl -f http://localhost:3000 > /dev/null
+        curl -f http://localhost:3000/health > /dev/null
+        curl -f http://localhost:3000/favicon.ico > /dev/null
+        curl -f http://localhost:3000/static/css/main.css > /dev/null
+        curl -f http://localhost:3000/results.json > /dev/null
+        curl -f http://localhost:3000/details/security > /dev/null
+  test_k8s: &test_k8s
+    run:
+      name: Test Kubernetes Deployments
+      command: |
+        if [[ -z $CIRCLE_PR_NUMBER ]]; then
+          ./test/webhook_test.sh
+          ./test/kube_dashboard_test.sh
+        else
+          echo "Skipping Kubernetes tests for forked PR"
+        fi
+
+  # Release scripts
+  install_goreleaser: &install_goreleaser
+    run:
+      name: Install GoReleaser
+      command: |
+        curl -fsSLo goreleaser.deb https://github.com/goreleaser/goreleaser/releases/download/v0.94.0/goreleaser_amd64.deb
+        echo "8dbad6683d6fc9367e637e6eed8e01a0d63c9660  goreleaser.deb" | sha1sum -c
+        sudo dpkg -i goreleaser.deb
+        rm goreleaser.deb
+  docker_build_and_push: &docker_build_and_push
+    run:
+      name: Docker login, build, and push
+      command: |
+        docker-pull -f .circleci/build.config
+        docker-build -f .circleci/build.config
+        if [[ -z $CIRCLE_PR_NUMBER ]]; then
+          docker login quay.io -u="${fairwinds_quay_user}" -p="${fairwinds_quay_token}"
+          docker-push -f .circleci/build.config
+        else
+          echo "Skipping docker push for forked PR"
+        fi
+  release_deploy_configs: &release_deploy_configs
+    run:
+      name: Release deploy configs
+      command: |
+        upload_url=$(curl --silent https://api.github.com/repos/FairwindsOps/polaris/releases/latest | grep upload_url)
+        upload_url=$(echo $upload_url | sed -e 's/.*\(https.*\){.*$/\1/')
+        curl -X POST "$upload_url?name=dashboard.yaml" --data-binary "@./deploy/dashboard.yaml" -H "Authorization: Bearer $GITHUB_TOKEN" -H "Content-Type: application/x-yaml"
+        curl -X POST "$upload_url?name=webhook.yaml" --data-binary "@./deploy/webhook.yaml" -H "Authorization: Bearer $GITHUB_TOKEN" -H "Content-Type: application/x-yaml"
+
+jobs:
+  build:
+    docker:
+      - image: quay.io/reactiveops/ci-images:v8.0-stretch
+    steps:
+      - checkout
+      - setup_remote_docker
+      - *set_environment_variables
+      - *docker_build_and_push
+
+  test_k8s:
+    working_directory: ~/polaris
+    resource_class: medium
+    executor: vm
+    steps:
+      - checkout
+      - *install_k8s
+      - *test_k8s
+
+  test:
+    working_directory: /go/src/github.com/fairwindsops/polaris/
+    docker:
+      - image: circleci/golang:1.12
+    steps:
+      - checkout
+      - run: go get -u golang.org/x/lint/golint
+      - run: go list ./... | grep -v vendor | xargs golint -set_exit_status
+      - run: go list ./... | grep -v vendor | xargs go vet
+      - run: go test ./pkg/... -coverprofile=coverage.txt -covermode=count
+      - run: go run main.go --audit-path ./deploy --set-exit-code-below-score 100 --set-exit-code-on-error
+      - *update_coverage
+      - *test_binary_dashboard
+
+  release_binary:
+    working_directory: /go/src/github.com/fairwindsops/polaris/
+    docker:
+      - image: circleci/golang:1.12
+    steps:
+      - checkout
+      - setup_remote_docker
+      - *set_environment_variables
+      - *install_goreleaser
+      - run: go get -u github.com/gobuffalo/packr/v2/packr2
+      - run: packr2
+      - run: goreleaser
+      - *release_deploy_configs
+
+  release_images:
+    working_directory: /go/src/github.com/fairwindsops/polaris/
+    docker:
+      - image: quay.io/reactiveops/ci-images:v8.0-stretch
+    steps:
+      - checkout
+      - setup_remote_docker
+      - *set_environment_variables
+      - *docker_build_and_push
+
+workflows:
+  version: 2
+  build:
+    jobs:
+      - test
+      - build:
+          requires:
+            - test
+          context: org-global
+          # Allow using testing tags for testing circle test + build steps
+          filters:
+            tags:
+              only: /^testing-.*/
+      - test_k8s:
+          requires:
+            - build
+  release:
+    jobs:
+      - release_binary:
+          context: org-global
+          filters:
+            branches:
+              ignore: /.*/
+            # Testing tags are reserved for testing circle test + build steps
+            tags:
+              ignore: /^testing-.*/
+      - release_images:
+          requires:
+            - release_binary
+          context: org-global
+          filters:
+            branches:
+              ignore: /.*/
+            # Testing tags are reserved for testing circle test + build steps
+            tags:
+              ignore: /^testing-.*/
