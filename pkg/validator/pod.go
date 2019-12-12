@@ -27,14 +27,14 @@ type PodValidation struct {
 }
 
 // ValidatePod validates that each pod conforms to the Polaris config, returns a ResourceResult.
-func ValidatePod(conf config.Configuration, pod *corev1.PodSpec, controllerName string, controllerType config.SupportedController, scans *ScansSummary) PodResult {
+func ValidatePod(conf *config.Configuration, pod *corev1.PodSpec, controllerName string, controllerType config.SupportedController, scans *ScansSummary) PodResult {
 	pv := PodValidation{
 		Pod:                pod,
 		ResourceValidation: &ResourceValidation{},
 	}
 
-	pv.validateSecurity(&conf, controllerName)
-	pv.validateNetworking(&conf, controllerName)
+	pv.validateSecurity(conf, controllerName)
+	pv.validateNetworking(conf, controllerName)
 
 	pRes := PodResult{
 		Messages:         pv.messages(),
@@ -43,8 +43,8 @@ func ValidatePod(conf config.Configuration, pod *corev1.PodSpec, controllerName 
 		podSpec:          *pod,
 	}
 
-	pv.validateContainers(pod.InitContainers, &pRes, &conf, controllerName, controllerType, true, scans)
-	pv.validateContainers(pod.Containers, &pRes, &conf, controllerName, controllerType, false, scans)
+	pv.validateContainers(pod.InitContainers, &pRes, conf, controllerName, controllerType, true, scans)
+	pv.validateContainers(pod.Containers, &pRes, conf, controllerName, controllerType, false, scans)
 
 	for _, cRes := range pRes.ContainerResults {
 		pRes.Summary.appendResults(*cRes.Summary)

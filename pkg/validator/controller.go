@@ -23,7 +23,7 @@ import (
 )
 
 // ValidateController validates a single controller, returns a ControllerResult.
-func ValidateController(conf conf.Configuration, controller controller.Interface, scans *ScansSummary) ControllerResult {
+func ValidateController(conf *conf.Configuration, controller controller.Interface, scans *ScansSummary) ControllerResult {
 	controllerType := controller.GetType()
 	pod := controller.GetPodSpec()
 	podResult := ValidatePod(conf, pod, controller.GetName(), controllerType, scans)
@@ -36,7 +36,7 @@ func ValidateController(conf conf.Configuration, controller controller.Interface
 
 // ValidateControllers validates that each deployment conforms to the Polaris config,
 // builds a list of ResourceResults organized by namespace.
-func ValidateControllers(config conf.Configuration, kubeResources *kube.ResourceProvider, nsResults *NamespacedResults, scans *ScansSummary) {
+func ValidateControllers(config *conf.Configuration, kubeResources *kube.ResourceProvider, nsResults *NamespacedResults, scans *ScansSummary) {
 	var controllersToAudit []controller.Interface
 	for _, supportedControllers := range config.ControllersToScan {
 		loadedControllers, _ := controllers.LoadControllersByType(supportedControllers, kubeResources)

@@ -89,9 +89,9 @@ func main() {
 	}
 
 	if *service {
-		startScannersServer(c, *auditPath, *servicePort, *serviceBasePath)
+		startScannersServer(&c, *servicePort, *serviceBasePath)
 	} else if *audit {
-		auditData := runAndReportAudit(c, *auditPath, *auditOutputFile, *auditOutputURL, *auditOutputFormat)
+		auditData := runAndReportAudit(&c, *auditPath, *auditOutputFile, *auditOutputURL, *auditOutputFormat)
 
 		if *setExitCode && auditData.ClusterSummary.Results.Totals.Errors > 0 {
 			logrus.Infof("%d errors found in audit", auditData.ClusterSummary.Results.Totals.Errors)
@@ -103,12 +103,11 @@ func main() {
 	}
 }
 
-func startScannersServer(c conf.Configuration, auditPath string, port int, basePath string) {
-	var auditDataPtr *validator.AuditData
-	router := service.GetRouter(c, auditPath, port, basePath, auditDataPtr)
+func startScannersServer(c *conf.Configuration, port int, basePath string) {
+	handler := service.NewHandler(c, port, basePath)
 
 	srv := &http.Server{
-		Handler: router,
+		Handler: handler.GetRouter(),
 		Addr:    fmt.Sprintf(":%d", port),
 	}
 
@@ -116,7 +115,7 @@ func startScannersServer(c conf.Configuration, auditPath string, port int, baseP
 	logrus.Fatal(srv.ListenAndServe())
 }
 
-func runAndReportAudit(c conf.Configuration, auditPath string, outputFile string, outputURL string, outputFormat string) validator.AuditData {
+func runAndReportAudit(c *conf.Configuration, auditPath string, outputFile string, outputURL string, outputFormat string) validator.AuditData {
 	// Create a kubernetes client resource provider
 	k, err := kube.CreateResourceProvider(auditPath)
 	if err != nil {

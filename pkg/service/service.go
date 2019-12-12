@@ -27,119 +27,116 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// GetRouter returns a mux router serving all routes necessary for the dashboard
-func GetRouter(c config.Configuration, auditPath string, port int, basePath string, auditData *validator.AuditData) *mux.Router {
+type Handler struct {
+	config   *config.Configuration
+	basePath string
+	port     int
+	router   *mux.Router
+	scanner  *scanner.ImageScanner
+}
+
+func NewHandler(c *config.Configuration, port int, basePath string) *Handler {
 	router := mux.NewRouter().PathPrefix(basePath).Subrouter()
 	kubeScanner := scanner.NewScanner(c.Images.ScannerUrl)
 
-	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("OK"))
-	})
+	h := &Handler{
+		config:   c,
+		basePath: basePath,
+		port:     port,
+		router:   router,
+		scanner:  kubeScanner,
+	}
 
-	router.HandleFunc("/results.json", func(w http.ResponseWriter, r *http.Request) {
-		if auditData == nil {
-			k, err := kube.CreateResourceProvider(auditPath)
-			if err != nil {
-				logrus.Errorf("Error fetching Kubernetes resources %v", err)
-				http.Error(w, "Error fetching Kubernetes resources", http.StatusInternalServerError)
-				return
-			}
+	router.HandleFunc("/health", h.health)
+	router.HandleFunc("/ready", h.ready)
 
-			k.FilterByNamespace(c.NamespacesToScan...)
-			auditDataObj, err := validator.RunAudit(c, k)
-			if err != nil {
-				http.Error(w, "Error Fetching Deployments", http.StatusInternalServerError)
-				return
-			}
-			auditData = &auditDataObj
-		}
-
-		JSONHandler(w, auditData)
-	})
-
-	router.HandleFunc("/api/container-images/", getImageScansSummary(c, kubeScanner))
-
-	router.HandleFunc("/api/container-image/{imageTag:.*}", getImageScanDetailsByTag(kubeScanner))
+	router.HandleFunc("/api/container-images/", h.getImageScansSummary)
+	router.HandleFunc("/api/container-image/{imageTag:.*}", h.getImageScanDetailsByTag)
 
 	// legacy endpoint name. Keep for backward-compatibility
-	router.HandleFunc("/image/{imageTag:.*}", getImageScanDetailsByTag(kubeScanner))
+	router.HandleFunc("/image/{imageTag:.*}", h.getImageScanDetailsByTag)
+	router.HandleFunc("/", h.main)
 
-	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/" && r.URL.Path != basePath {
-			http.NotFound(w, r)
-			return
-		}
-
-		if auditData == nil {
-			k, err := kube.CreateResourceProvider(auditPath)
-			if err != nil {
-				logrus.Errorf("Error fetching Kubernetes resources %v", err)
-				http.Error(w, "Error fetching Kubernetes resources", http.StatusInternalServerError)
-				return
-			}
-
-			k.FilterByNamespace(c.NamespacesToScan...)
-			auditData, err := validator.RunAudit(c, k)
-			if err != nil {
-				logrus.Errorf("Error getting audit data: %v", err)
-				http.Error(w, "Error running audit", 500)
-				return
-			}
-
-			JSONHandler(w, auditData)
-		} else {
-			JSONHandler(w, auditData)
-		}
-
-	})
-	return router
+	return h
 }
 
-func getImageScansSummary(c config.Configuration, kubeScanner *scanner.ImageScanner) func(http.ResponseWriter, *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		pods, err := kube.CreatePodsProviderFromCluster(c.NamespacesToScan...)
-		if err != nil {
-			logrus.Errorf("Error fetching Kubernetes resources %v", err)
-			http.Error(w, "Error fetching Kubernetes resources", http.StatusInternalServerError)
-			return
-		}
+func (h *Handler) GetRouter() *mux.Router {
+	return h.router
+}
 
-		imageTags := kube.GetAllImageTags(pods)
-		scans, err := kubeScanner.GetAll(imageTags)
-		if err != nil {
-			logrus.Errorf("Error fetching Image Scans %v", err)
-			http.Error(w, "Error fetching Image Scans", http.StatusInternalServerError)
-			return
-		}
+func (h *Handler) health(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte("OK"))
+}
 
-		result := CreateImageScansSummary(pods, scans)
-		JSONHandler(w, result)
+func (h *Handler) ready(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte("OK"))
+}
+
+func (h *Handler) main(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" && r.URL.Path != h.basePath {
+		http.NotFound(w, r)
+		return
 	}
-}
 
-func getImageScanDetailsByTag(kubeScanner *scanner.ImageScanner) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		vars := mux.Vars(r)
-		imageTag := vars["imageTag"]
-
-		decodedValue, err := url.QueryUnescape(imageTag)
-		if err != nil {
-			logrus.Error(err, "Failed to unescape", imageTag)
-			return
-		}
-
-		scanResult, err := kubeScanner.Get(decodedValue)
-		if err != nil {
-			logrus.Error(err, "Failed to get image scan details", imageTag)
-			return
-		}
-
-		JSONHandler(w, &scanResult)
+	k, err := kube.CreateResourceProviderFromCluster()
+	if err != nil {
+		logrus.Errorf("Error fetching Kubernetes resources %v", err)
+		http.Error(w, "Error fetching Kubernetes resources", http.StatusInternalServerError)
+		return
 	}
+
+	k.FilterByNamespace(h.config.NamespacesToScan...)
+	auditData, err := validator.RunAudit(h.config, k)
+	if err != nil {
+		logrus.Errorf("Error getting audit data: %v", err)
+		http.Error(w, "Error running audit", 500)
+		return
+	}
+
+	jsonHandler(w, auditData)
 }
 
-// JSONHandler gets template data and renders json with it.
-func JSONHandler(w http.ResponseWriter, result interface{}) {
+func (h *Handler) getImageScansSummary(w http.ResponseWriter, r *http.Request) {
+	pods, err := kube.CreatePodsProviderFromCluster(h.config.NamespacesToScan...)
+	if err != nil {
+		logrus.Errorf("Error fetching Kubernetes resources %v", err)
+		http.Error(w, "Error fetching Kubernetes resources", http.StatusInternalServerError)
+		return
+	}
+
+	imageTags := kube.GetAllImageTags(pods)
+	scans, err := h.scanner.GetAll(imageTags)
+	if err != nil {
+		logrus.Errorf("Error fetching Image Scans %v", err)
+		http.Error(w, "Error fetching Image Scans", http.StatusInternalServerError)
+		return
+	}
+
+	result := CreateImageScansSummary(pods, scans)
+	jsonHandler(w, result)
+}
+
+func (h *Handler) getImageScanDetailsByTag(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	imageTag := vars["imageTag"]
+
+	decodedValue, err := url.QueryUnescape(imageTag)
+	if err != nil {
+		logrus.Error(err, "Failed to unescape", imageTag)
+		return
+	}
+
+	scanResult, err := h.scanner.Get(decodedValue)
+	if err != nil {
+		logrus.Error(err, "Failed to get image scan details", imageTag)
+		return
+	}
+
+	jsonHandler(w, &scanResult)
+}
+
+// jsonHandler gets template data and renders json with it.
+func jsonHandler(w http.ResponseWriter, result interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(result)
