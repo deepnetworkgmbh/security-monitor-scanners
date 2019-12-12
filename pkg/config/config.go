@@ -1,131 +1,59 @@
-// Copyright 2019 FairwindsOps Inc
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package config
 
 import (
 	"bytes"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
+	"path"
 	"strings"
 
-	packr "github.com/gobuffalo/packr/v2"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
+	"github.com/gobuffalo/packr/v2"
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
-// Configuration contains all of the config for the validation checks.
-type Configuration struct {
-	DisplayName        string                `json:"displayName"`
-	Resources          Resources             `json:"resources"`
-	HealthChecks       HealthChecks          `json:"healthChecks"`
-	Images             Images                `json:"images"`
-	Networking         Networking            `json:"networking"`
-	Security           Security              `json:"security"`
-	ControllersToScan  []SupportedController `json:"controllers_to_scan"`
-	NamespacesToScan   []string              `json:"namespaces_to_scan"`
-	Exemptions         []Exemption           `json:"exemptions"`
-	DisallowExemptions bool                  `json:"disallowExemptions"`
+// PolarisConfiguration contains all of the config for the validation checks.
+type Config struct {
+	Services Services `json:"services"`
+	Configs  Configs  `json:"configs"`
+	Kube     Kube     `json:"kube"`
 }
 
-// Exemption represents an exemption to normal rules
-type Exemption struct {
-	Rules           []string `json:"rules"`
-	ControllerNames []string `json:"controllerNames"`
+// Services contains addresses of dependent services.
+type Services struct {
+	ScannerUrl string `json:"scannerUrl"`
 }
 
-// Resources contains config for resource requests and limits.
-type Resources struct {
-	CPURequestsMissing    Severity       `json:"cpuRequestsMissing"`
-	CPURequestRanges      ResourceRanges `json:"cpuRequestRanges"`
-	CPULimitsMissing      Severity       `json:"cpuLimitsMissing"`
-	CPULimitRanges        ResourceRanges `json:"cpuLimitRanges"`
-	MemoryRequestsMissing Severity       `json:"memoryRequestsMissing"`
-	MemoryRequestRanges   ResourceRanges `json:"memoryRequestRanges"`
-	MemoryLimitsMissing   Severity       `json:"memoryLimitsMissing"`
-	MemoryLimitRanges     ResourceRanges `json:"memoryLimitRanges"`
+// Configs contains names of config files
+type Configs struct {
+	Polaris string `json:"polaris"`
 }
 
-// ResourceRanges contains config for requests or limits for a specific resource.
-type ResourceRanges struct {
-	Warning ResourceRange `json:"warning"`
-	Error   ResourceRange `json:"error"`
+type Kube struct {
+	NamespacesToScan []string `json:"namespaces_to_scan"`
 }
 
-// ResourceRange can contain below and above conditions for validation.
-type ResourceRange struct {
-	Below *resource.Quantity `json:"below"`
-	Above *resource.Quantity `json:"above"`
+func (c *Config) GetPolarisPath() (string, error) {
+	if len(c.Configs.Polaris) > 0 {
+		return c.Configs.Polaris, nil
+	}
+
+	dir, err := os.Getwd()
+	if err != nil {
+		logrus.Errorf("Error getting current working directory: %v", err)
+		return "", err
+	}
+
+	path := path.Join(dir, "examples", "polaris-config.yaml")
+
+	return path, nil
 }
 
-// HealthChecks contains config for readiness and liveness probes.
-type HealthChecks struct {
-	ReadinessProbeMissing Severity `json:"readinessProbeMissing"`
-	LivenessProbeMissing  Severity `json:"livenessProbeMissing"`
-}
-
-// Images contains the config for images.
-type Images struct {
-	TagNotSpecified         Severity          `json:"tagNotSpecified"`
-	PullPolicyNotAlways     Severity          `json:"pullPolicyNotAlways"`
-	Whitelist               ErrorWarningLists `json:"whitelist"`
-	Blacklist               ErrorWarningLists `json:"blacklist"`
-	VulnerabilityScanFailed Severity          `json:"vulnerabilityScanFailed"`
-	ScannerUrl              string            `json:"scannerUrl"`
-}
-
-// ErrorWarningLists provides lists of patterns to match or avoid in image tags.
-type ErrorWarningLists struct {
-	Error   []string `json:"error"`
-	Warning []string `json:"warning"`
-}
-
-// Networking contains the config for networking validations.
-type Networking struct {
-	HostNetworkSet Severity `json:"hostNetworkSet"`
-	HostPortSet    Severity `json:"hostPortSet"`
-}
-
-// Security contains the config for security validations.
-type Security struct {
-	HostIPCSet                 Severity             `json:"hostIPCSet"`
-	HostPIDSet                 Severity             `json:"hostPIDSet"`
-	RunAsRootAllowed           Severity             `json:"runAsRootAllowed"`
-	RunAsPrivileged            Severity             `json:"runAsPrivileged"`
-	NotReadOnlyRootFileSystem  Severity             `json:"notReadOnlyRootFileSystem"`
-	PrivilegeEscalationAllowed Severity             `json:"privilegeEscalationAllowed"`
-	Capabilities               SecurityCapabilities `json:"capabilities"`
-}
-
-// SecurityCapabilities contains the config for security capabilities validations.
-type SecurityCapabilities struct {
-	Error   SecurityCapabilityLists `json:"error"`
-	Warning SecurityCapabilityLists `json:"warning"`
-}
-
-// SecurityCapabilityLists contains the config for security capabilitie list validations.
-type SecurityCapabilityLists struct {
-	IfAnyAdded       []corev1.Capability `json:"ifAnyAdded"`
-	IfAnyAddedBeyond []corev1.Capability `json:"ifAnyAddedBeyond"`
-	IfAnyNotDropped  []corev1.Capability `json:"ifAnyNotDropped"`
-}
-
-// ParseFile parses config from a file.
-func ParseFile(path string) (Configuration, error) {
+// NewConfig parses Scanners service config.
+func NewConfig(path string) (Config, error) {
 	var rawBytes []byte
 	var err error
 	if path == "" {
@@ -135,7 +63,7 @@ func ParseFile(path string) (Configuration, error) {
 		//path is a url
 		response, err2 := http.Get(path)
 		if err2 != nil {
-			return Configuration{}, err2
+			return Config{}, err2
 		}
 		rawBytes, err = ioutil.ReadAll(response.Body)
 	} else {
@@ -143,15 +71,15 @@ func ParseFile(path string) (Configuration, error) {
 		rawBytes, err = ioutil.ReadFile(path)
 	}
 	if err != nil {
-		return Configuration{}, err
+		return Config{}, err
 	}
-	return Parse(rawBytes)
+	return ParseConfig(rawBytes)
 }
 
-// Parse parses config from a byte array.
-func Parse(rawBytes []byte) (Configuration, error) {
+// ParseConfig parses config from a byte array.
+func ParseConfig(rawBytes []byte) (Config, error) {
 	reader := bytes.NewReader(rawBytes)
-	conf := Configuration{}
+	conf := Config{}
 	d := yaml.NewYAMLOrJSONDecoder(reader, 4096)
 	for {
 		if err := d.Decode(&conf); err != nil {

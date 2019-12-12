@@ -1,43 +1,28 @@
-// Copyright 2019 FairwindsOps Inc
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package service
 
 import (
 	"encoding/json"
-	scanner "github.com/deepnetworkgmbh/security-monitor-scanners/pkg/imagescanner"
-	"net/http"
-	"net/url"
-
 	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/config"
+	scanner "github.com/deepnetworkgmbh/security-monitor-scanners/pkg/imagescanner"
 	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/kube"
 	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/validator"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
+	"net/http"
+	"net/url"
 )
 
 type Handler struct {
-	config   *config.Configuration
+	config   *config.Config
 	basePath string
 	port     int
 	router   *mux.Router
 	scanner  *scanner.ImageScanner
 }
 
-func NewHandler(c *config.Configuration, port int, basePath string) *Handler {
+func NewHandler(c *config.Config, port int, basePath string) *Handler {
 	router := mux.NewRouter().PathPrefix(basePath).Subrouter()
-	kubeScanner := scanner.NewScanner(c.Images.ScannerUrl)
+	kubeScanner := scanner.NewScanner(c.Services.ScannerUrl)
 
 	h := &Handler{
 		config:   c,
@@ -47,15 +32,18 @@ func NewHandler(c *config.Configuration, port int, basePath string) *Handler {
 		scanner:  kubeScanner,
 	}
 
-	router.HandleFunc("/health", h.health)
-	router.HandleFunc("/ready", h.ready)
+	router.Methods("GET").Path("/health").HandlerFunc(h.health)
+	router.Methods("GET").Path("/ready").HandlerFunc(h.ready)
 
-	router.HandleFunc("/api/container-images/", h.getImageScansSummary)
-	router.HandleFunc("/api/container-image/{imageTag:.*}", h.getImageScanDetailsByTag)
+	router.Methods("GET").Path("/api/container-images/").HandlerFunc(h.getImageScansSummary)
+	router.Methods("GET").Path("/api/container-image/{imageTag:.*}").HandlerFunc(h.getImageScanDetailsByTag)
+
+	router.Methods("GET").Path("/api/kube-objects/polaris").HandlerFunc(h.getImageScanDetailsByTag)
+	router.Methods("POST").Path("/api/kube-objects/polaris").HandlerFunc(h.getImageScanDetailsByTag)
 
 	// legacy endpoint name. Keep for backward-compatibility
-	router.HandleFunc("/image/{imageTag:.*}", h.getImageScanDetailsByTag)
-	router.HandleFunc("/", h.main)
+	router.Methods("GET").Path("/image/{imageTag:.*}").HandlerFunc(h.getImageScanDetailsByTag)
+	router.Methods("GET").Path("/").HandlerFunc(h.main)
 
 	return h
 }
@@ -73,11 +61,6 @@ func (h *Handler) ready(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) main(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" && r.URL.Path != h.basePath {
-		http.NotFound(w, r)
-		return
-	}
-
 	k, err := kube.CreateResourceProviderFromCluster()
 	if err != nil {
 		logrus.Errorf("Error fetching Kubernetes resources %v", err)
@@ -85,8 +68,16 @@ func (h *Handler) main(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	k.FilterByNamespace(h.config.NamespacesToScan...)
-	auditData, err := validator.RunAudit(h.config, k)
+	path, err := h.config.GetPolarisPath()
+	if err != nil {
+		logrus.Errorf("Error getting Polaris config %v", err)
+		http.Error(w, "Error getting Polaris config", http.StatusInternalServerError)
+		return
+	}
+
+	polarisConfig, err := config.ParsePolarisConfig(path)
+	k.FilterByNamespace(h.config.Kube.NamespacesToScan...)
+	auditData, err := validator.RunAudit(&polarisConfig, k)
 	if err != nil {
 		logrus.Errorf("Error getting audit data: %v", err)
 		http.Error(w, "Error running audit", 500)
@@ -97,7 +88,7 @@ func (h *Handler) main(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) getImageScansSummary(w http.ResponseWriter, r *http.Request) {
-	pods, err := kube.CreatePodsProviderFromCluster(h.config.NamespacesToScan...)
+	pods, err := kube.CreatePodsProviderFromCluster(h.config.Kube.NamespacesToScan...)
 	if err != nil {
 		logrus.Errorf("Error fetching Kubernetes resources %v", err)
 		http.Error(w, "Error fetching Kubernetes resources", http.StatusInternalServerError)

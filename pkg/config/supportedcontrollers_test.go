@@ -75,7 +75,7 @@ func TestMarshalSupportedControllers(t *testing.T) {
 }
 
 func TestCheckIfControllerKindIsConfiguredForValidation(t *testing.T) {
-	config := Configuration{}
+	config := PolarisConfiguration{}
 	for _, controllerString := range ControllerStrings[1:] {
 		controllerEnum, err := GetSupportedControllerFromString(controllerString)
 		if err != nil {

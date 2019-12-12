@@ -23,7 +23,7 @@ import (
 )
 
 func TestValidatePod(t *testing.T) {
-	c := conf.Configuration{
+	c := conf.PolarisConfiguration{
 		Security: conf.Security{
 			HostIPCSet: conf.SeverityError,
 			HostPIDSet: conf.SeverityError,
@@ -71,7 +71,7 @@ func TestValidatePod(t *testing.T) {
 }
 
 func TestInvalidIPCPod(t *testing.T) {
-	c := conf.Configuration{
+	c := conf.PolarisConfiguration{
 		Security: conf.Security{
 			HostIPCSet: conf.SeverityError,
 			HostPIDSet: conf.SeverityError,
@@ -119,7 +119,7 @@ func TestInvalidIPCPod(t *testing.T) {
 }
 
 func TestInvalidNeworkPod(t *testing.T) {
-	c := conf.Configuration{
+	c := conf.PolarisConfiguration{
 		Networking: conf.Networking{
 			HostNetworkSet: conf.SeverityWarning,
 			HostPortSet:    conf.SeverityError,
@@ -169,7 +169,7 @@ func TestInvalidNeworkPod(t *testing.T) {
 }
 
 func TestInvalidPIDPod(t *testing.T) {
-	c := conf.Configuration{
+	c := conf.PolarisConfiguration{
 		Security: conf.Security{
 			HostIPCSet: conf.SeverityError,
 			HostPIDSet: conf.SeverityError,
@@ -218,7 +218,7 @@ func TestInvalidPIDPod(t *testing.T) {
 }
 
 func TestExemption(t *testing.T) {
-	c := conf.Configuration{
+	c := conf.PolarisConfiguration{
 		Security: conf.Security{
 			HostIPCSet: conf.SeverityError,
 			HostPIDSet: conf.SeverityError,

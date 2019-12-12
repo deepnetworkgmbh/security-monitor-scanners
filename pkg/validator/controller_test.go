@@ -26,7 +26,7 @@ import (
 )
 
 func TestValidateController(t *testing.T) {
-	c := conf.Configuration{
+	c := conf.PolarisConfiguration{
 		Security: conf.Security{
 			HostIPCSet: conf.SeverityError,
 			HostPIDSet: conf.SeverityError,
@@ -61,7 +61,7 @@ func TestValidateController(t *testing.T) {
 }
 
 func TestSkipHealthChecks(t *testing.T) {
-	c := conf.Configuration{
+	c := conf.PolarisConfiguration{
 		HealthChecks: conf.HealthChecks{
 			ReadinessProbeMissing: conf.SeverityError,
 			LivenessProbeMissing:  conf.SeverityWarning,

@@ -136,7 +136,7 @@ func GetSupportedControllerFromString(str string) (SupportedController, error) {
 }
 
 // CheckIfKindIsConfiguredForValidation takes a kind (in string format) and checks if Polaris is configured to scan this type of controller
-func (c Configuration) CheckIfKindIsConfiguredForValidation(kind string) bool {
+func (c PolarisConfiguration) CheckIfKindIsConfiguredForValidation(kind string) bool {
 	controller, err := GetSupportedControllerFromString(kind)
 	// if no errors then we found the kind in supported controller types
 	if err == nil {

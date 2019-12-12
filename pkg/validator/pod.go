@@ -27,7 +27,7 @@ type PodValidation struct {
 }
 
 // ValidatePod validates that each pod conforms to the Polaris config, returns a ResourceResult.
-func ValidatePod(conf *config.Configuration, pod *corev1.PodSpec, controllerName string, controllerType config.SupportedController, scans *ScansSummary) PodResult {
+func ValidatePod(conf *config.PolarisConfiguration, pod *corev1.PodSpec, controllerName string, controllerType config.SupportedController, scans *ScansSummary) PodResult {
 	pv := PodValidation{
 		Pod:                pod,
 		ResourceValidation: &ResourceValidation{},
@@ -53,14 +53,14 @@ func ValidatePod(conf *config.Configuration, pod *corev1.PodSpec, controllerName
 	return pRes
 }
 
-func (pv *PodValidation) validateContainers(containers []corev1.Container, pRes *PodResult, conf *config.Configuration, controllerName string, controllerType config.SupportedController, isInit bool, scans *ScansSummary) {
+func (pv *PodValidation) validateContainers(containers []corev1.Container, pRes *PodResult, conf *config.PolarisConfiguration, controllerName string, controllerType config.SupportedController, isInit bool, scans *ScansSummary) {
 	for _, container := range containers {
 		cRes := ValidateContainer(&container, pRes, conf, controllerName, controllerType, isInit, scans)
 		pRes.ContainerResults = append(pRes.ContainerResults, cRes)
 	}
 }
 
-func (pv *PodValidation) validateSecurity(conf *config.Configuration, controllerName string) {
+func (pv *PodValidation) validateSecurity(conf *config.PolarisConfiguration, controllerName string) {
 	category := messages.CategorySecurity
 
 	name := "HostIPCSet"
@@ -84,7 +84,7 @@ func (pv *PodValidation) validateSecurity(conf *config.Configuration, controller
 	}
 }
 
-func (pv *PodValidation) validateNetworking(conf *config.Configuration, controllerName string) {
+func (pv *PodValidation) validateNetworking(conf *config.PolarisConfiguration, controllerName string) {
 	category := messages.CategoryNetworking
 
 	name := "HostNetworkSet"

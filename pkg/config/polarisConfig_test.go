@@ -66,9 +66,6 @@ controllers_to_scan:
   - CronJobs
   - DaemonSets
   - ReplicationControllers
-namespaces_to_scan: 
-  - default
-  - test
 `
 
 var resourceConfJSON1 = `{
@@ -114,25 +111,24 @@ var resourceConfJSON1 = `{
 			}
 		}
 	},
-	"controllers_to_scan": ["Deployments", "StatefulSets", "Jobs", "CronJobs", "DaemonSets", "ReplicationControllers"],
-	"namespaces_to_scan": ["default", "test"]
+	"controllers_to_scan": ["Deployments", "StatefulSets", "Jobs", "CronJobs", "DaemonSets", "ReplicationControllers"]
 }`
 
 func TestParseError(t *testing.T) {
-	_, err := Parse([]byte(resourceConfInvalid1))
-	expectedErr := "Decoding config failed: error unmarshaling JSON: while decoding JSON: json: cannot unmarshal string into Go value of type config.Configuration"
+	_, err := ParsePolaris([]byte(resourceConfInvalid1))
+	expectedErr := "Decoding config failed: error unmarshaling JSON: while decoding JSON: json: cannot unmarshal string into Go value of type config.PolarisConfiguration"
 	assert.EqualError(t, err, expectedErr)
 }
 
 func TestParseYaml(t *testing.T) {
-	parsedConf, err := Parse([]byte(resourceConfYAML1))
+	parsedConf, err := ParsePolaris([]byte(resourceConfYAML1))
 	assert.NoError(t, err, "Expected no error when parsing YAML config")
 
 	testParsedConfig(t, &parsedConf)
 }
 
 func TestParseJson(t *testing.T) {
-	parsedConf, err := Parse([]byte(resourceConfJSON1))
+	parsedConf, err := ParsePolaris([]byte(resourceConfJSON1))
 	assert.NoError(t, err, "Expected no error when parsing JSON config")
 
 	testParsedConfig(t, &parsedConf)
@@ -140,7 +136,7 @@ func TestParseJson(t *testing.T) {
 
 func TestConfigFromURL(t *testing.T) {
 	var err error
-	var parsedConf Configuration
+	var parsedConf PolarisConfiguration
 	srv := &http.Server{Addr: ":8081"}
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, resourceConfYAML1)
@@ -153,7 +149,7 @@ func TestConfigFromURL(t *testing.T) {
 	}()
 	time.Sleep(time.Second)
 
-	parsedConf, err = ParseFile("http://localhost:8081/exampleURL")
+	parsedConf, err = ParsePolarisConfig("http://localhost:8081/exampleURL")
 	assert.NoError(t, err, "Expected no error when parsing YAML from URL")
 	if err := srv.Shutdown(context.TODO()); err != nil {
 		panic(err)
@@ -164,12 +160,12 @@ func TestConfigFromURL(t *testing.T) {
 
 func TestConfigNoServerError(t *testing.T) {
 	var err error
-	_, err = ParseFile("http://localhost:8081/exampleURL")
+	_, err = ParsePolarisConfig("http://localhost:8081/exampleURL")
 	assert.Error(t, err)
 	assert.Regexp(t, regexp.MustCompile("connection refused"), err.Error())
 }
 
-func testParsedConfig(t *testing.T, config *Configuration) {
+func testParsedConfig(t *testing.T, config *PolarisConfiguration) {
 	cpuRequests := config.Resources.CPURequestRanges
 	assert.Equal(t, int64(100), cpuRequests.Error.Below.ScaledValue(resource.Milli))
 	assert.Equal(t, int64(1000), cpuRequests.Error.Above.ScaledValue(resource.Milli))
@@ -196,5 +192,4 @@ func testParsedConfig(t *testing.T, config *Configuration) {
 
 	controllersToScan := config.ControllersToScan
 	assert.ElementsMatch(t, []SupportedController{Deployments, StatefulSets, Jobs, CronJobs, DaemonSets, ReplicationControllers}, controllersToScan)
-	assert.ElementsMatch(t, []string{"default", "test"}, config.NamespacesToScan)
 }

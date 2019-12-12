@@ -126,7 +126,7 @@ func testValidateResources(t *testing.T, container *corev1.Container, resourceCo
 		ResourceValidation: &ResourceValidation{},
 	}
 
-	parsedConf, err := conf.Parse([]byte(*resourceConf))
+	parsedConf, err := conf.ParsePolaris([]byte(*resourceConf))
 	assert.NoError(t, err, "Expected no error when parsing config")
 
 	cv.validateResources(&parsedConf, controllerName)
@@ -151,7 +151,7 @@ func TestValidateResourcesEmptyConfig(t *testing.T) {
 		ResourceValidation: &ResourceValidation{},
 	}
 
-	cv.validateResources(&conf.Configuration{}, "")
+	cv.validateResources(&conf.PolarisConfiguration{}, "")
 	assert.Len(t, cv.Errors, 0)
 }
 
@@ -260,7 +260,7 @@ func TestValidateResourcesInit(t *testing.T) {
 		IsInitContainer:    true,
 	}
 
-	parsedConf, err := conf.Parse([]byte(resourceConf1))
+	parsedConf, err := conf.ParsePolaris([]byte(resourceConf1))
 	assert.NoError(t, err, "Expected no error when parsing config")
 
 	cvEmpty.validateResources(&parsedConf, "")
@@ -411,7 +411,7 @@ func TestValidateHealthChecks(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.cv.validateHealthChecks(&conf.Configuration{HealthChecks: tt.probes}, "")
+			tt.cv.validateHealthChecks(&conf.PolarisConfiguration{HealthChecks: tt.probes}, "")
 
 			if tt.warnings != nil {
 				assert.Len(t, tt.cv.Warnings, len(*tt.warnings))
@@ -524,7 +524,7 @@ func TestValidateImage(t *testing.T) {
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.cv = resetCV(tt.cv)
-			tt.cv.validateImage(&conf.Configuration{Images: tt.image}, "", nil)
+			tt.cv.validateImage(&conf.PolarisConfiguration{Images: tt.image}, "", nil)
 			assert.Len(t, tt.cv.Errors, len(tt.expected))
 			assert.ElementsMatch(t, tt.cv.Errors, tt.expected)
 		})
@@ -643,7 +643,7 @@ func TestValidateNetworking(t *testing.T) {
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.cv = resetCV(tt.cv)
-			tt.cv.validateNetworking(&conf.Configuration{Networking: tt.networkConf}, "")
+			tt.cv.validateNetworking(&conf.PolarisConfiguration{Networking: tt.networkConf}, "")
 			assert.Len(t, tt.cv.messages(), len(tt.expectedMessages))
 			assert.ElementsMatch(t, tt.cv.messages(), tt.expectedMessages)
 		})
@@ -1133,7 +1133,7 @@ func TestValidateSecurity(t *testing.T) {
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.cv = resetCV(tt.cv)
-			tt.cv.validateSecurity(&conf.Configuration{Security: tt.securityConf}, "")
+			tt.cv.validateSecurity(&conf.PolarisConfiguration{Security: tt.securityConf}, "")
 			assert.Len(t, tt.cv.messages(), len(tt.expectedMessages))
 			assert.ElementsMatch(t, tt.cv.messages(), tt.expectedMessages)
 		})
@@ -1145,7 +1145,7 @@ func TestValidateRunAsRoot(t *testing.T) {
 	trueVar := true
 	nonRootUser := int64(1000)
 	rootUser := int64(0)
-	config := conf.Configuration{
+	config := conf.PolarisConfiguration{
 		Security: conf.Security{
 			RunAsRootAllowed: conf.SeverityWarning,
 		},

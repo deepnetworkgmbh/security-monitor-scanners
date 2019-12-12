@@ -7,6 +7,11 @@ metadata:
     app: scanners
 data:
   config.yaml:  |
+    services:
+      scannerUrl: http://image-scanner
+    configs:
+      polaris: /opt/app/configs/polaris-config.yaml
+  polaris-config.yaml:  |
     resources:
       cpuRequestsMissing: warning
       cpuLimitsMissing: warning
@@ -14,8 +19,6 @@ data:
       memoryLimitsMissing: warning
     images:
       tagNotSpecified: error
-      vulnerabilityScanFailed: warning
-      scannerUrl: http://image-scanner
     healthChecks:
       readinessProbeMissing: warning
       livenessProbeMissing: warning
@@ -161,10 +164,11 @@ spec:
       containers:
       - command:
         - scanners
-        - --service
         - --config
         - /opt/app/config.yaml
-        image: 'deepnetwork/security-monitor-scanners:0.1.0'
+        - --polaris-config
+        - /opt/app/polaris-config.yaml
+        image: 'deepnetwork/security-monitor-scanners:0.2.0'
         imagePullPolicy: 'Always'
         name: scanners
         ports:
@@ -199,7 +203,11 @@ spec:
               - ALL
         volumeMounts:
         - name: config
-          mountPath: /opt/app/config.yaml
+          mountPath: /opt/app/configs/config.yaml
           subPath: config.yaml
+          readOnly: true
+        - name: polaris-config
+          mountPath: /opt/app/configs/polaris-config.yaml
+          subPath: polaris-config.yaml
           readOnly: true
       serviceAccountName: scanners

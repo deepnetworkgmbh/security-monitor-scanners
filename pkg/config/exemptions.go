@@ -6,7 +6,7 @@ import (
 )
 
 // IsActionable determines whether a check is actionable given the current configuration
-func (conf *Configuration) IsActionable(subConf interface{}, ruleName, controllerName string) bool {
+func (conf *PolarisConfiguration) IsActionable(subConf interface{}, ruleName, controllerName string) bool {
 	ruleID := GetIDFromField(subConf, ruleName)
 	subConfRef := reflect.ValueOf(subConf)
 	fieldVal := reflect.Indirect(subConfRef).FieldByName(ruleName).Interface()

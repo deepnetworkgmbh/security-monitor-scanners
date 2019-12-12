@@ -15,7 +15,7 @@ func TestGetTemplateData(t *testing.T) {
 	resources, err := kube.CreateResourceProviderFromAPI(k8s, "test")
 	assert.Equal(t, err, nil, "error should be nil")
 
-	c := conf.Configuration{
+	c := conf.PolarisConfiguration{
 		HealthChecks: conf.HealthChecks{
 			ReadinessProbeMissing: conf.SeverityError,
 			LivenessProbeMissing:  conf.SeverityWarning,

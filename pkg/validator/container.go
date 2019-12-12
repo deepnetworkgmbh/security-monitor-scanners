@@ -40,7 +40,7 @@ type ContainerValidation struct {
 //       relevant podSpec in order to check certain aspects of a containerSpec.
 //       Perhaps there is a more ideal solution instead of attaching a parent
 //       podSpec to every container Validation struct...
-func ValidateContainer(container *corev1.Container, parentPodResult *PodResult, conf *config.Configuration, controllerName string, controllerType config.SupportedController, isInit bool, scans *ScansSummary) ContainerResult {
+func ValidateContainer(container *corev1.Container, parentPodResult *PodResult, conf *config.PolarisConfiguration, controllerName string, controllerType config.SupportedController, isInit bool, scans *ScansSummary) ContainerResult {
 	cv := ContainerValidation{
 		Container:          container,
 		ResourceValidation: &ResourceValidation{},
@@ -78,7 +78,7 @@ func ValidateContainer(container *corev1.Container, parentPodResult *PodResult, 
 	return cRes
 }
 
-func (cv *ContainerValidation) validateResources(conf *config.Configuration, controllerName string) {
+func (cv *ContainerValidation) validateResources(conf *config.PolarisConfiguration, controllerName string) {
 	// Only validate resources for primary containers. Although it can
 	// be helpful to set these in certain cases, it usually isn't
 	if cv.IsInitContainer {
@@ -157,7 +157,7 @@ func (cv *ContainerValidation) validateResourceRange(id, resourceName string, ra
 	}
 }
 
-func (cv *ContainerValidation) validateHealthChecks(conf *config.Configuration, controllerName string) {
+func (cv *ContainerValidation) validateHealthChecks(conf *config.PolarisConfiguration, controllerName string) {
 	category := messages.CategoryHealthChecks
 
 	name := "ReadinessProbeMissing"
@@ -182,7 +182,7 @@ func (cv *ContainerValidation) validateHealthChecks(conf *config.Configuration, 
 	}
 }
 
-func (cv *ContainerValidation) validateImage(conf *config.Configuration, controllerName string, scans *ScansSummary) {
+func (cv *ContainerValidation) validateImage(conf *config.PolarisConfiguration, controllerName string, scans *ScansSummary) {
 	category := messages.CategoryImages
 
 	name := "PullPolicyNotAlways"
@@ -226,7 +226,7 @@ func (cv *ContainerValidation) validateImage(conf *config.Configuration, control
 	}
 }
 
-func (cv *ContainerValidation) validateNetworking(conf *config.Configuration, controllerName string) {
+func (cv *ContainerValidation) validateNetworking(conf *config.PolarisConfiguration, controllerName string) {
 	category := messages.CategoryNetworking
 
 	name := "HostPortSet"
@@ -248,7 +248,7 @@ func (cv *ContainerValidation) validateNetworking(conf *config.Configuration, co
 	}
 }
 
-func (cv *ContainerValidation) validateSecurity(conf *config.Configuration, controllerName string) {
+func (cv *ContainerValidation) validateSecurity(conf *config.PolarisConfiguration, controllerName string) {
 	category := messages.CategorySecurity
 	securityContext := cv.Container.SecurityContext
 	podSecurityContext := cv.parentPodSpec.SecurityContext
