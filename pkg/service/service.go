@@ -5,6 +5,7 @@ import (
 	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/config"
 	scanner "github.com/deepnetworkgmbh/security-monitor-scanners/pkg/imagescanner"
 	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/kube"
+	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/polaris"
 	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/validator"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
@@ -38,8 +39,9 @@ func NewHandler(c *config.Config, port int, basePath string) *Handler {
 	router.Methods("GET").Path("/api/container-images/").HandlerFunc(h.getImageScansSummary)
 	router.Methods("GET").Path("/api/container-image/{imageTag:.*}").HandlerFunc(h.getImageScanDetailsByTag)
 
-	router.Methods("GET").Path("/api/kube-objects/polaris").HandlerFunc(h.getImageScanDetailsByTag)
-	router.Methods("POST").Path("/api/kube-objects/polaris").HandlerFunc(h.getImageScanDetailsByTag)
+	router.Methods("GET").Path("/api/kube-objects/polaris").HandlerFunc(h.getPolarisAuditResult)
+	router.Methods("GET").Path("/api/kube-objects/polaris/{requestId}").HandlerFunc(h.getPolarisAuditResultById)
+	router.Methods("POST").Path("/api/kube-objects/polaris").HandlerFunc(h.requestPolarisAudit)
 
 	// legacy endpoint name. Keep for backward-compatibility
 	router.Methods("GET").Path("/image/{imageTag:.*}").HandlerFunc(h.getImageScanDetailsByTag)
@@ -52,15 +54,15 @@ func (h *Handler) GetRouter() *mux.Router {
 	return h.router
 }
 
-func (h *Handler) health(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) health(w http.ResponseWriter, _ *http.Request) {
 	w.Write([]byte("OK"))
 }
 
-func (h *Handler) ready(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ready(w http.ResponseWriter, _ *http.Request) {
 	w.Write([]byte("OK"))
 }
 
-func (h *Handler) main(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) main(w http.ResponseWriter, _ *http.Request) {
 	k, err := kube.CreateResourceProviderFromCluster()
 	if err != nil {
 		logrus.Errorf("Error fetching Kubernetes resources %v", err)
@@ -77,7 +79,7 @@ func (h *Handler) main(w http.ResponseWriter, r *http.Request) {
 
 	polarisConfig, err := config.ParsePolarisConfig(path)
 	k.FilterByNamespace(h.config.Kube.NamespacesToScan...)
-	auditData, err := validator.RunAudit(&polarisConfig, k)
+	auditData, err := validator.RunAudit(&polarisConfig, k, h.scanner)
 	if err != nil {
 		logrus.Errorf("Error getting audit data: %v", err)
 		http.Error(w, "Error running audit", 500)
@@ -87,7 +89,7 @@ func (h *Handler) main(w http.ResponseWriter, r *http.Request) {
 	jsonHandler(w, auditData)
 }
 
-func (h *Handler) getImageScansSummary(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) getImageScansSummary(w http.ResponseWriter, _ *http.Request) {
 	pods, err := kube.CreatePodsProviderFromCluster(h.config.Kube.NamespacesToScan...)
 	if err != nil {
 		logrus.Errorf("Error fetching Kubernetes resources %v", err)
@@ -124,6 +126,40 @@ func (h *Handler) getImageScanDetailsByTag(w http.ResponseWriter, r *http.Reques
 	}
 
 	jsonHandler(w, &scanResult)
+}
+
+func (h *Handler) getPolarisAuditResult(w http.ResponseWriter, _ *http.Request) {
+	auditData, err := polaris.AuditKubeCluster(h.config)
+	if err != nil {
+		logrus.Errorf("Error getting audit data: %v", err)
+		http.Error(w, "Error running audit", 500)
+		return
+	}
+
+	jsonHandler(w, auditData)
+}
+
+func (h *Handler) getPolarisAuditResultById(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	requestId := vars["requestId"]
+
+	auditData, err := polaris.GetAuditResultById(h.config, requestId)
+	if err != nil {
+		logrus.Errorf("Error getting audit data for id %v: %v ", requestId, err)
+		http.Error(w, "Error running audit", 500)
+		return
+	}
+
+	jsonHandler(w, auditData)
+}
+
+func (h *Handler) requestPolarisAudit(w http.ResponseWriter, _ *http.Request) {
+	requestId := polaris.RequestAudit(h.config)
+	response := RequestAuditResponse{
+		RequestId: requestId,
+	}
+
+	jsonHandler(w, response)
 }
 
 // jsonHandler gets template data and renders json with it.

@@ -4,13 +4,12 @@ import (
 	"time"
 
 	conf "github.com/deepnetworkgmbh/security-monitor-scanners/pkg/config"
+	scanner "github.com/deepnetworkgmbh/security-monitor-scanners/pkg/imagescanner"
 	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/kube"
-	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/imagescanner"
 )
 
 // RunAudit runs a full Polaris audit and returns an AuditData object
-func RunAudit(config *conf.PolarisConfiguration, kubeResources *kube.ResourceProvider) (AuditData, error) {
-	kubeScanner := imagescanner.NewScanner(config.Images.ScannerUrl)
+func RunAudit(config *conf.PolarisConfiguration, kubeResources *kube.ResourceProvider, kubeScanner *scanner.ImageScanner) (AuditData, error) {
 	imageTags := kube.GetAllImageTags(kubeResources.Pods)
 	go kubeScanner.Scan(imageTags)
 

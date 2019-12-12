@@ -210,7 +210,7 @@ func (cv *ContainerValidation) validateImage(conf *config.PolarisConfiguration, 
 		return
 	}
 
-	id := config.GetIDFromField(conf.Images, "VulnerabilityScanFailed")
+	const id = "vulnerabilityScanFailed"
 	if result, exist := scans.Scans[cv.Container.Image]; exist {
 		cv.ScanSummary = result
 		switch result.GetSeverity() {

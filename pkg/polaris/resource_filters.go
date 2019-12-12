@@ -1,10 +1,25 @@
-package kube
+package polaris
 
 import (
-	corev1 "k8s.io/api/core/v1"
+	polaris "github.com/fairwindsops/polaris/pkg/kube"
 )
 
-func filterNamespaces(rp *ResourceProvider, namespaces []string) {
+func filterByNamespace(rp *polaris.ResourceProvider, namespaces ...string) {
+	if len(namespaces) == 0 {
+		return
+	}
+
+	filterNamespaces(rp, namespaces)
+	filterDeployments(rp, namespaces)
+	filterStatefulSets(rp, namespaces)
+	filterDaemonSets(rp, namespaces)
+	filterJobs(rp, namespaces)
+	filterCronJobs(rp, namespaces)
+	filterReplicationControllers(rp, namespaces)
+	filterPods(rp, namespaces)
+}
+
+func filterNamespaces(rp *polaris.ResourceProvider, namespaces []string) {
 	filtered := rp.Namespaces[:0]
 	for _, x := range rp.Namespaces {
 		for _, ns := range namespaces {
@@ -17,7 +32,7 @@ func filterNamespaces(rp *ResourceProvider, namespaces []string) {
 	rp.Namespaces = filtered
 }
 
-func filterDeployments(rp *ResourceProvider, namespaces []string) {
+func filterDeployments(rp *polaris.ResourceProvider, namespaces []string) {
 	filtered := rp.Deployments[:0]
 	for _, x := range rp.Deployments {
 		for _, ns := range namespaces {
@@ -30,7 +45,7 @@ func filterDeployments(rp *ResourceProvider, namespaces []string) {
 	rp.Deployments = filtered
 }
 
-func filterStatefulSets(rp *ResourceProvider, namespaces []string) {
+func filterStatefulSets(rp *polaris.ResourceProvider, namespaces []string) {
 	filtered := rp.StatefulSets[:0]
 	for _, x := range rp.StatefulSets {
 		for _, ns := range namespaces {
@@ -43,7 +58,7 @@ func filterStatefulSets(rp *ResourceProvider, namespaces []string) {
 	rp.StatefulSets = filtered
 }
 
-func filterDaemonSets(rp *ResourceProvider, namespaces []string) {
+func filterDaemonSets(rp *polaris.ResourceProvider, namespaces []string) {
 	filtered := rp.DaemonSets[:0]
 	for _, x := range rp.DaemonSets {
 		for _, ns := range namespaces {
@@ -56,7 +71,7 @@ func filterDaemonSets(rp *ResourceProvider, namespaces []string) {
 	rp.DaemonSets = filtered
 }
 
-func filterJobs(rp *ResourceProvider, namespaces []string) {
+func filterJobs(rp *polaris.ResourceProvider, namespaces []string) {
 	filtered := rp.Jobs[:0]
 	for _, x := range rp.Jobs {
 		for _, ns := range namespaces {
@@ -69,7 +84,7 @@ func filterJobs(rp *ResourceProvider, namespaces []string) {
 	rp.Jobs = filtered
 }
 
-func filterCronJobs(rp *ResourceProvider, namespaces []string) {
+func filterCronJobs(rp *polaris.ResourceProvider, namespaces []string) {
 	filtered := rp.CronJobs[:0]
 	for _, x := range rp.CronJobs {
 		for _, ns := range namespaces {
@@ -82,7 +97,7 @@ func filterCronJobs(rp *ResourceProvider, namespaces []string) {
 	rp.CronJobs = filtered
 }
 
-func filterReplicationControllers(rp *ResourceProvider, namespaces []string) {
+func filterReplicationControllers(rp *polaris.ResourceProvider, namespaces []string) {
 	filtered := rp.ReplicationControllers[:0]
 	for _, x := range rp.ReplicationControllers {
 		for _, ns := range namespaces {
@@ -95,21 +110,15 @@ func filterReplicationControllers(rp *ResourceProvider, namespaces []string) {
 	rp.ReplicationControllers = filtered
 }
 
-func filterPods(pods []corev1.Pod, namespaces []string) []corev1.Pod {
-	if len(namespaces) == 0 {
-		return pods
-	}
-
-	filtered := pods[:0]
-	for _, x := range pods {
+func filterPods(rp *polaris.ResourceProvider, namespaces []string) {
+	filtered := rp.Pods[:0]
+	for _, x := range rp.Pods {
 		for _, ns := range namespaces {
 			if x.Namespace == ns {
 				filtered = append(filtered, x)
 			}
 		}
 	}
-	for i := len(filtered); i < len(pods); i++ {
-		pods[i] = corev1.Pod{}
-	}
-	return filtered
+
+	rp.Pods = filtered
 }

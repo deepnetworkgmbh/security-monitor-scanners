@@ -57,7 +57,7 @@ func NewConfig(path string) (Config, error) {
 	var rawBytes []byte
 	var err error
 	if path == "" {
-		configBox := packr.New("Config", "../../examples")
+		configBox := packr.New("ScannersConfig", "../../examples")
 		rawBytes, err = configBox.Find("config.yaml")
 	} else if strings.HasPrefix(path, "https://") || strings.HasPrefix(path, "http://") {
 		//path is a url

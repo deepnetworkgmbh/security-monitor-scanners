@@ -83,8 +83,6 @@ type Images struct {
 	PullPolicyNotAlways     Severity          `json:"pullPolicyNotAlways"`
 	Whitelist               ErrorWarningLists `json:"whitelist"`
 	Blacklist               ErrorWarningLists `json:"blacklist"`
-	VulnerabilityScanFailed Severity          `json:"vulnerabilityScanFailed"`
-	ScannerUrl              string            `json:"scannerUrl"`
 }
 
 // ErrorWarningLists provides lists of patterns to match or avoid in image tags.
@@ -128,7 +126,7 @@ func ParsePolarisConfig(path string) (PolarisConfiguration, error) {
 	var rawBytes []byte
 	var err error
 	if path == "" {
-		configBox := packr.New("Config", "../../examples")
+		configBox := packr.New("PolarisConfig", "../../examples")
 		rawBytes, err = configBox.Find("polaris-config.yaml")
 	} else if strings.HasPrefix(path, "https://") || strings.HasPrefix(path, "http://") {
 		//path is a url

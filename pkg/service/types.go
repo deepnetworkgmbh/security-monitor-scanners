@@ -6,6 +6,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+// RequestAuditResponse DTO to represent a new scan/audit response
+type RequestAuditResponse struct {
+	RequestId string `json:"requestId"`
+}
+
 // ImageScansSummary represents a summary of container images vulnerabilities audit
 type ImageScansSummary struct {
 	Images []ImageScanResult `json:"images"`
