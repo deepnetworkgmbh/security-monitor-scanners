@@ -165,9 +165,7 @@ spec:
       - command:
         - scanners
         - --config
-        - /opt/app/config.yaml
-        - --polaris-config
-        - /opt/app/polaris-config.yaml
+        - /opt/app/configs/config.yaml
         image: 'deepnetwork/security-monitor-scanners:0.2.0'
         imagePullPolicy: 'Always'
         name: scanners
@@ -206,7 +204,7 @@ spec:
           mountPath: /opt/app/configs/config.yaml
           subPath: config.yaml
           readOnly: true
-        - name: polaris-config
+        - name: config
           mountPath: /opt/app/configs/polaris-config.yaml
           subPath: polaris-config.yaml
           readOnly: true
