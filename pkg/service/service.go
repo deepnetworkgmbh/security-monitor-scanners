@@ -22,7 +22,7 @@ type Handler struct {
 }
 
 func NewHandler(c *config.Config, port int, basePath string) *Handler {
-	router := mux.NewRouter().PathPrefix(basePath).Subrouter()
+	router := mux.NewRouter().PathPrefix(basePath).Subrouter().StrictSlash(true)
 	kubeScanner := scanner.NewScanner(c.Services.ScannerUrl)
 
 	h := &Handler{
@@ -33,18 +33,18 @@ func NewHandler(c *config.Config, port int, basePath string) *Handler {
 		scanner:  kubeScanner,
 	}
 
-	router.Methods("GET").Path("/health").HandlerFunc(h.health)
-	router.Methods("GET").Path("/ready").HandlerFunc(h.ready)
+	router.Methods("GET").Path("/health/").HandlerFunc(h.health)
+	router.Methods("GET").Path("/ready/").HandlerFunc(h.ready)
 
 	router.Methods("GET").Path("/api/vulnerabilities/").HandlerFunc(h.getVulnerabilitiesSummary)
-	router.Methods("GET").Path("/api/vulnerabilities/{id}").HandlerFunc(h.getVulnerabilityById)
+	router.Methods("GET").Path("/api/vulnerabilities/{id}/").HandlerFunc(h.getVulnerabilityById)
 
 	router.Methods("GET").Path("/api/container-images/").HandlerFunc(h.getImageScansSummary)
 	router.Methods("GET").Path("/api/container-image/{imageTag:.*}").HandlerFunc(h.getImageScanDetailsByTag)
 
-	router.Methods("GET").Path("/api/kube-objects/polaris").HandlerFunc(h.getPolarisAuditResult)
-	router.Methods("GET").Path("/api/kube-objects/polaris/{requestId}").HandlerFunc(h.getPolarisAuditResultById)
-	router.Methods("POST").Path("/api/kube-objects/polaris").HandlerFunc(h.requestPolarisAudit)
+	router.Methods("GET").Path("/api/kube-objects/polaris/").HandlerFunc(h.getPolarisAuditResult)
+	router.Methods("GET").Path("/api/kube-objects/polaris/{requestId}/").HandlerFunc(h.getPolarisAuditResultById)
+	router.Methods("POST").Path("/api/kube-objects/polaris/").HandlerFunc(h.requestPolarisAudit)
 
 	// legacy endpoint name. Keep for backward-compatibility
 	router.Methods("GET").Path("/image/{imageTag:.*}").HandlerFunc(h.getImageScanDetailsByTag)
