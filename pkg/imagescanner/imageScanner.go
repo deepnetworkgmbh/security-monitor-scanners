@@ -54,6 +54,18 @@ type VulnerabilityCounter struct {
 	Count    int    `json:"count"`
 }
 
+type CveDetails struct {
+	Id               string   `json:"id"`
+	Package          string   `json:"packageName"`
+	InstalledVersion string   `json:"installedVersion"`
+	FixedVersion     string   `json:"fixedVersion"`
+	Title            string   `json:"title"`
+	Description      string   `json:"description"`
+	Severity         string   `json:"severity"`
+	References       []string `json:"references"`
+	Images           []string `json:"imageTags"`
+}
+
 func (s *ImageScanResultSummary) GetSeverity() string {
 	switch s.ScanResult {
 	case "Succeeded":
@@ -118,40 +130,91 @@ func (s *ImageScanner) Scan(images []string) {
 	logrus.Info(bodyString)
 }
 
-// Get returns detailed single image scan result
-func (s *ImageScanner) Get(image string) (scanResult ImageScanResult, err error) {
+// GetScanResult returns detailed single image scan result
+func (s *ImageScanner) GetScanResult(image string) (scanResult ImageScanResult, err error) {
 	scanResultURL := fmt.Sprintf("%s/scan-results/trivy/%s", s.ScannerURL, url.QueryEscape(image))
 
 	resp, err := http.Get(scanResultURL)
 	if err != nil {
 		logrus.Errorf("Error requesting image scan result %v", err)
-		return
+		return ImageScanResult{}, err
 	}
 
 	defer resp.Body.Close()
 
-	json.NewDecoder(resp.Body).Decode(&scanResult)
+	err = json.NewDecoder(resp.Body).Decode(&scanResult)
+	if err != nil {
+		logrus.Errorf("Failed to deserialize Image Scan Result: %v", err)
+		return ImageScanResult{}, err
+	}
 
-	return
+	return scanResult, nil
 }
 
-// GetAll returns scan result summary for an array of images
-func (s *ImageScanner) GetAll(images []string) (scanResults []ImageScanResultSummary, err error) {
+// GetScanResults returns scan result summary for an array of images
+func (s *ImageScanner) GetScanResults(images []string) (scanResults []ImageScanResultSummary, err error) {
 	getURL := fmt.Sprintf("%s/scan-results/trivy?", s.ScannerURL)
 
 	for _, image := range images {
 		getURL = fmt.Sprintf("%s&images=%s", getURL, url.QueryEscape(image))
 	}
 
-	scanRequestsURL := getURL[:len(getURL)]
-	resp, err := http.Get(scanRequestsURL)
+	resp, err := http.Get(getURL)
 	if err != nil {
 		logrus.Errorf("Error requesting images scan results %v", err)
-		return
+		return make([]ImageScanResultSummary, 0), err
 	}
 
 	defer resp.Body.Close()
 
-	json.NewDecoder(resp.Body).Decode(&scanResults)
-	return
+	err = json.NewDecoder(resp.Body).Decode(&scanResults)
+	if err != nil {
+		logrus.Errorf("Failed to deserialize Scans Summary: %v", err)
+		return make([]ImageScanResultSummary, 0), err
+	}
+
+	return scanResults, nil
 }
+
+// GetCve returns detailed cve description
+func (s *ImageScanner) GetCve(id string) (details CveDetails, err error) {
+	cveURL := fmt.Sprintf("%s/cve/%s", s.ScannerURL, url.QueryEscape(id))
+
+	resp, err := http.Get(cveURL)
+	if err != nil {
+		logrus.Errorf("Error requesting cve details: %v", err)
+		return CveDetails{}, err
+	}
+
+	defer resp.Body.Close()
+
+	err = json.NewDecoder(resp.Body).Decode(&details)
+	if err != nil {
+		logrus.Errorf("Failed to deserialize CVE details: %v", err)
+		return CveDetails{}, err
+	}
+
+	return details, nil
+}
+
+// GetCveSummary returns All known CVEs summary
+func (s *ImageScanner) GetCveSummary() (details []CveDetails, err error) {
+	cveURL := fmt.Sprintf("%s/cve/overview", s.ScannerURL)
+
+	resp, err := http.Get(cveURL)
+	if err != nil {
+		logrus.Errorf("Error requesting CVEs overview: %v", err)
+		return make([]CveDetails, 0), err
+	}
+
+	defer resp.Body.Close()
+
+	err = json.NewDecoder(resp.Body).Decode(&details)
+	if err != nil {
+		logrus.Errorf("Failed to deserialize CVE details: %v", err)
+		return make([]CveDetails, 0), err
+	}
+
+	return details, nil
+}
+

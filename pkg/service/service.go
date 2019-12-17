@@ -36,6 +36,9 @@ func NewHandler(c *config.Config, port int, basePath string) *Handler {
 	router.Methods("GET").Path("/health").HandlerFunc(h.health)
 	router.Methods("GET").Path("/ready").HandlerFunc(h.ready)
 
+	router.Methods("GET").Path("/api/vulnerabilities/").HandlerFunc(h.getVulnerabilitiesSummary)
+	router.Methods("GET").Path("/api/vulnerabilities/{id}").HandlerFunc(h.getVulnerabilityById)
+
 	router.Methods("GET").Path("/api/container-images/").HandlerFunc(h.getImageScansSummary)
 	router.Methods("GET").Path("/api/container-image/{imageTag:.*}").HandlerFunc(h.getImageScanDetailsByTag)
 
@@ -89,6 +92,31 @@ func (h *Handler) main(w http.ResponseWriter, _ *http.Request) {
 	jsonHandler(w, auditData)
 }
 
+func (h *Handler) getVulnerabilityById(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	cve, err := h.scanner.GetCve(id)
+	if err != nil {
+		logrus.Errorf("Error fetching CVE details: %v", err)
+		http.Error(w, "Error fetching CVE details", http.StatusInternalServerError)
+		return
+	}
+
+	jsonHandler(w, &cve)
+}
+
+func (h *Handler) getVulnerabilitiesSummary(w http.ResponseWriter, _ *http.Request) {
+	cveSummary, err := h.scanner.GetCveSummary()
+	if err != nil {
+		logrus.Errorf("Error fetching CVE summary: %v", err)
+		http.Error(w, "Error fetching CVE summary", http.StatusInternalServerError)
+		return
+	}
+
+	jsonHandler(w, &cveSummary)
+}
+
 func (h *Handler) getImageScansSummary(w http.ResponseWriter, _ *http.Request) {
 	pods, err := kube.CreatePodsProviderFromCluster(h.config.Kube.NamespacesToScan...)
 	if err != nil {
@@ -98,7 +126,7 @@ func (h *Handler) getImageScansSummary(w http.ResponseWriter, _ *http.Request) {
 	}
 
 	imageTags := kube.GetAllImageTags(pods)
-	scans, err := h.scanner.GetAll(imageTags)
+	scans, err := h.scanner.GetScanResults(imageTags)
 	if err != nil {
 		logrus.Errorf("Error fetching Image Scans %v", err)
 		http.Error(w, "Error fetching Image Scans", http.StatusInternalServerError)
@@ -119,7 +147,7 @@ func (h *Handler) getImageScanDetailsByTag(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	scanResult, err := h.scanner.Get(decodedValue)
+	scanResult, err := h.scanner.GetScanResult(decodedValue)
 	if err != nil {
 		logrus.Error(err, "Failed to get image scan details", imageTag)
 		return

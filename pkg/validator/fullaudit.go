@@ -13,7 +13,7 @@ func RunAudit(config *conf.PolarisConfiguration, kubeResources *kube.ResourcePro
 	imageTags := kube.GetAllImageTags(kubeResources.Pods)
 	go kubeScanner.Scan(imageTags)
 
-	scans, _ := kubeScanner.GetAll(imageTags)
+	scans, _ := kubeScanner.GetScanResults(imageTags)
 
 	scanResults := ScansSummary{}
 	scanResults.calculateResults(scans)
