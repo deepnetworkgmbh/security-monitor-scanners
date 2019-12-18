@@ -2,22 +2,29 @@ package service
 
 import (
 	"fmt"
+	scanner "github.com/deepnetworkgmbh/security-monitor-scanners/pkg/imagescanner"
 	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/kube"
 	"github.com/fairwindsops/polaris/pkg/validator"
+	"k8s.io/api/core/v1"
 	"strings"
 )
 
-func CreateKubeOverview(kubeResources *kube.ResourceProvider) KubeOverview {
-	return KubeOverview{
+func CreateKubeOverview(kube *kube.ResourceProvider, auditData *validator.AuditData, imageScanner *scanner.ImageScanner) *KubeOverview {
+	overview := KubeOverview{
 		Cluster: ClusterSummary{
-			Name:            kubeResources.SourceName,
-			Version:         kubeResources.ServerVersion,
-			NodesCount:      len(kubeResources.Nodes),
-			NamespacesCount: len(kubeResources.Namespaces),
-			PodsCount:       len(kubeResources.Pods),
+			Name:            kube.SourceName,
+			Version:         kube.ServerVersion,
+			NodesCount:      len(kube.Nodes),
+			NamespacesCount: len(kube.Namespaces),
+			PodsCount:       len(kube.Pods),
 		},
 		Checks: make([]Check, 0),
 	}
+	overview.addPolarisResults(auditData)
+	overview.addImageScanResults(kube, imageScanner)
+	overview.calculateSummaries()
+
+	return &overview;
 }
 
 type KubeOverview struct {
@@ -48,10 +55,10 @@ type Check struct {
 type CheckResult string
 
 const(
-    Success CheckResult = "success"
-    Error = "error"
-    Warning = "warning"
-    NoData = "nodata"
+	Success CheckResult = "success"
+	Error = "error"
+	Warning = "warning"
+	NoData = "nodata"
 )
 
 type ResultSummary struct {
@@ -75,7 +82,7 @@ func (result *ResultSummary) Add(checkResult CheckResult){
 	}
 }
 
-func (overview *KubeOverview) AddPolarisResults(auditData *validator.AuditData) {
+func (overview *KubeOverview) addPolarisResults(auditData *validator.AuditData) {
 	for ns := range auditData.NamespacedResults {
 		for j := range auditData.NamespacedResults[ns].CronJobResults {
 			checks := mapController(ns, auditData.NamespacedResults[ns].CronJobResults[j], "cron-jobs")
@@ -104,7 +111,88 @@ func (overview *KubeOverview) AddPolarisResults(auditData *validator.AuditData) 
 	}
 }
 
-func (overview *KubeOverview) CalculateSummaries() {
+func (overview *KubeOverview) addImageScanResults(kube *kube.ResourceProvider, imageScanner *scanner.ImageScanner){
+	temp := imageScansHelper{
+		images:    make(map[string]bool, 0),
+		resources: make(map[string]string, 0),
+		scans:     make(map[string]scanner.ImageScanResultSummary, 0),
+	}
+
+	for i := range kube.Deployments {
+		prefix := fmt.Sprintf("/ns/%s/deployments/%s", kube.Deployments[i].Namespace, kube.Deployments[i].Name)
+		parsePodTemplate(&kube.Deployments[i].Spec.Template.Spec, prefix, &temp)
+	}
+	for i := range kube.DaemonSets {
+		prefix := fmt.Sprintf("/ns/%s/daemon-sets/%s", kube.DaemonSets[i].Namespace, kube.DaemonSets[i].Name)
+		parsePodTemplate(&kube.DaemonSets[i].Spec.Template.Spec, prefix, &temp)
+	}
+	for i := range kube.StatefulSets {
+		prefix := fmt.Sprintf("/ns/%s/stateful-sets/%s", kube.StatefulSets[i].Namespace, kube.StatefulSets[i].Name)
+		parsePodTemplate(&kube.StatefulSets[i].Spec.Template.Spec, prefix, &temp)
+	}
+	for i := range kube.ReplicationControllers {
+		prefix := fmt.Sprintf("/ns/%s/rc/%s", kube.ReplicationControllers[i].Namespace, kube.ReplicationControllers[i].Name)
+		parsePodTemplate(&kube.ReplicationControllers[i].Spec.Template.Spec, prefix, &temp)
+	}
+	for i := range kube.CronJobs {
+		prefix := fmt.Sprintf("/ns/%s/cron-jobs/%s", kube.CronJobs[i].Namespace, kube.CronJobs[i].Name)
+		parsePodTemplate(&kube.CronJobs[i].Spec.JobTemplate.Spec.Template.Spec, prefix, &temp)
+	}
+	for i := range kube.Jobs {
+		prefix := fmt.Sprintf("/ns/%s/jobs/%s", kube.Jobs[i].Namespace, kube.Jobs[i].Name)
+		parsePodTemplate(&kube.Jobs[i].Spec.Template.Spec, prefix, &temp)
+	}
+
+	i := 0
+	images := make([]string, len(temp.images))
+	for k := range temp.images {
+		images[i] = k
+		i++
+	}
+
+	scanResults, _ := imageScanner.GetScanResults(images)
+	for _, scan := range scanResults {
+		temp.scans[scan.Image] = scan
+	}
+
+	checks := make([]Check, 0)
+	for id, tag := range temp.resources {
+		if val, ok := temp.scans[tag]; ok {
+			check := Check{
+				GroupName:        "trivy.cve-scan",
+				Id:               "trivy.cveScan",
+				ResourceCategory: "containers",
+				ResourceFullName: id,
+				Result:           fromTrivyToCheckResult(val.GetSeverity()),
+			}
+			checks = append(checks, check)
+		}
+	}
+
+	overview.Checks = append(overview.Checks, checks...)
+}
+
+type imageScansHelper struct {
+	images    map[string]bool
+	resources map[string]string
+	scans     map[string]scanner.ImageScanResultSummary
+}
+
+func parsePodTemplate(spec *v1.PodSpec, prefix string, temp *imageScansHelper) {
+	for i := range spec.Containers {
+		id := fmt.Sprintf("%s/containers/%s", prefix, spec.Containers[i].Name)
+		temp.images[spec.Containers[i].Image] = true
+		temp.resources[id] = spec.Containers[i].Image
+	}
+
+	for i := range spec.InitContainers {
+		id := fmt.Sprintf("%s/init-containers/%s", prefix, spec.Containers[i].Name)
+		temp.images[spec.Containers[i].Image] = true
+		temp.resources[id] = spec.Containers[i].Image
+	}
+}
+
+func (overview *KubeOverview) calculateSummaries() {
 	nsDict := make(map[string]*ResultSummary, 0)
 	groupDict := make(map[string]*ResultSummary, 0)
 	checks := ResultSummary{
@@ -167,7 +255,7 @@ func convertToChecks(podResult *validator.PodResult, category string, prefix str
 			Id:               fmt.Sprintf("polaris.%s", message.ID),
 			ResourceCategory: category,
 			ResourceFullName: fmt.Sprintf("%s/pods", prefix),
-			Result:           toCheckResult(message.Type),
+			Result:           fromPolarisToCheckResult(message.Type),
 		}
 		checks = append(checks, check)
 	}
@@ -180,8 +268,8 @@ func convertToChecks(podResult *validator.PodResult, category string, prefix str
 				GroupName:        fmt.Sprintf("polaris.%s", message.Category),
 				Id:               fmt.Sprintf("polaris.%s", message.ID),
 				ResourceCategory: category,
-				ResourceFullName: fmt.Sprintf("%s/container/%s", prefix, container.Name),
-				Result:           toCheckResult(message.Type),
+				ResourceFullName: fmt.Sprintf("%s/containers/%s", prefix, container.Name),
+				Result:           fromPolarisToCheckResult(message.Type),
 			}
 			checks = append(checks, check)
 		}
@@ -190,14 +278,29 @@ func convertToChecks(podResult *validator.PodResult, category string, prefix str
 	return checks
 }
 
-func toCheckResult(polarisResult validator.MessageType) CheckResult {
-	switch polarisResult {
+func fromPolarisToCheckResult(result validator.MessageType) CheckResult {
+	switch result {
 	case validator.MessageTypeSuccess:
 		return Success
 	case validator.MessageTypeError:
 		return Error
 	case validator.MessageTypeWarning:
 		return Warning
+	default:
+		return NoData
+	}
+}
+
+func fromTrivyToCheckResult(result scanner.TrivyResult) CheckResult {
+	switch result {
+	case scanner.Success:
+		return Success
+	case scanner.Error:
+		return Error
+	case scanner.Warning:
+		return Warning
+	case scanner.NoData:
+		return NoData
 	default:
 		return NoData
 	}

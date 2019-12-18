@@ -172,11 +172,9 @@ func (h *Handler) getKubeOverview(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 
-	overview := CreateKubeOverview(kube)
-	overview.AddPolarisResults(auditData)
-	overview.CalculateSummaries()
+	overview := CreateKubeOverview(kube, auditData, h.scanner)
 
-	jsonHandler(w, &overview)
+	jsonHandler(w, overview)
 }
 
 func (h *Handler) getPolarisAuditResult(w http.ResponseWriter, _ *http.Request) {

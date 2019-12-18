@@ -66,22 +66,31 @@ type CveDetails struct {
 	Images           []string `json:"imageTags"`
 }
 
-func (s *ImageScanResultSummary) GetSeverity() string {
+type TrivyResult string
+
+const(
+	Success TrivyResult = "success"
+	Error               = "error"
+	Warning             = "warning"
+	NoData              = "nodata"
+)
+
+func (s *ImageScanResultSummary) GetSeverity() TrivyResult {
 	switch s.ScanResult {
 	case "Succeeded":
 		if len(s.Counters) == 0 {
-			return "Success"
+			return Success
 		} else {
 			for _, counter := range s.Counters {
 				if counter.Severity == "CRITICAL" || counter.Severity == "HIGH" {
-					return "Error"
+					return Error
 				}
 			}
 
-			return "Warning"
+			return Warning
 		}
 	default:
-		return "NoData"
+		return NoData
 	}
 }
 
