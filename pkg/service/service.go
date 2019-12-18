@@ -42,6 +42,7 @@ func NewHandler(c *config.Config, port int, basePath string) *Handler {
 	router.Methods("GET").Path("/api/container-images/").HandlerFunc(h.getImageScansSummary)
 	router.Methods("GET").Path("/api/container-image/{imageTag:.*}").HandlerFunc(h.getImageScanDetailsByTag)
 
+	router.Methods("GET").Path("/api/kube/overview/").HandlerFunc(h.getKubeOverview)
 	router.Methods("GET").Path("/api/kube-objects/polaris/").HandlerFunc(h.getPolarisAuditResult)
 	router.Methods("GET").Path("/api/kube-objects/polaris/{requestId}/").HandlerFunc(h.getPolarisAuditResultById)
 	router.Methods("POST").Path("/api/kube-objects/polaris/").HandlerFunc(h.requestPolarisAudit)
@@ -154,6 +155,28 @@ func (h *Handler) getImageScanDetailsByTag(w http.ResponseWriter, r *http.Reques
 	}
 
 	jsonHandler(w, &scanResult)
+}
+
+func (h *Handler) getKubeOverview(w http.ResponseWriter, _ *http.Request) {
+	kube, err := kube.CreateResourceProviderFromCluster()
+	if err != nil {
+		logrus.Errorf("Error creating kube provider: %v", err)
+		http.Error(w, "Error creating kube provider", 500)
+		return
+	}
+
+	auditData, err := polaris.AuditKubeCluster(h.config)
+	if err != nil {
+		logrus.Errorf("Error getting audit data: %v", err)
+		http.Error(w, "Error running audit", 500)
+		return
+	}
+
+	overview := CreateKubeOverview(kube)
+	overview.AddPolarisResults(auditData)
+	overview.CalculateSummaries()
+
+	jsonHandler(w, &overview)
 }
 
 func (h *Handler) getPolarisAuditResult(w http.ResponseWriter, _ *http.Request) {
