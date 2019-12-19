@@ -1,12 +1,6 @@
 package kube
 
 import (
-	"bytes"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"regexp"
-	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -15,7 +9,6 @@ import (
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	k8sYaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth" // Required for other auth providers like GKE.
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -38,10 +31,6 @@ type ResourceProvider struct {
 	Pods                   []corev1.Pod
 }
 
-type k8sResource struct {
-	Kind string `yaml:"kind"`
-}
-
 func GetAllImageTags(pods []corev1.Pod) []string {
 	set := make(map[string]bool)
 	for _, pod := range pods {
@@ -56,71 +45,12 @@ func GetAllImageTags(pods []corev1.Pod) []string {
 	i := 0
 	images := make([]string, len(set))
 
-	for k, _ := range set {
+	for k := range set {
 		images[i] = k
 		i++
 	}
 
 	return images
-}
-
-// CreateResourceProvider returns a new ResourceProvider object to interact with k8s resources
-func CreateResourceProvider(directory string) (*ResourceProvider, error) {
-	if directory != "" {
-		return CreateResourceProviderFromPath(directory)
-	}
-	return CreateResourceProviderFromCluster()
-}
-
-// CreateResourceProviderFromPath returns a new ResourceProvider using the YAML files in a directory
-func CreateResourceProviderFromPath(directory string) (*ResourceProvider, error) {
-	resources := ResourceProvider{
-		ServerVersion:          "unknown",
-		SourceType:             "Path",
-		SourceName:             directory,
-		Nodes:                  []corev1.Node{},
-		Deployments:            []appsv1.Deployment{},
-		StatefulSets:           []appsv1.StatefulSet{},
-		DaemonSets:             []appsv1.DaemonSet{},
-		Jobs:                   []batchv1.Job{},
-		CronJobs:               []batchv1beta1.CronJob{},
-		ReplicationControllers: []corev1.ReplicationController{},
-		Namespaces:             []corev1.Namespace{},
-		Pods:                   []corev1.Pod{},
-	}
-
-	addYaml := func(contents string) error {
-		return addResourceFromString(contents, &resources)
-	}
-
-	visitFile := func(path string, f os.FileInfo, err error) error {
-		if !strings.HasSuffix(path, ".yml") && !strings.HasSuffix(path, ".yaml") {
-			return nil
-		}
-		contents, err := ioutil.ReadFile(path)
-		if err != nil {
-			logrus.Errorf("Error reading file %v", path)
-			return err
-		}
-		specs := regexp.MustCompile("\n-+\n").Split(string(contents), -1)
-		for _, spec := range specs {
-			if strings.TrimSpace(spec) == "" {
-				continue
-			}
-			err = addYaml(spec)
-			if err != nil {
-				logrus.Errorf("Error parsing YAML: (%v)", err)
-				return err
-			}
-		}
-		return nil
-	}
-
-	err := filepath.Walk(directory, visitFile)
-	if err != nil {
-		return nil, err
-	}
-	return &resources, nil
 }
 
 // CreateResourceProviderFromCluster creates a new ResourceProvider using live data from a cluster
@@ -246,54 +176,4 @@ func (rp *ResourceProvider) FilterByNamespace(namespaces ...string) {
 	filterCronJobs(rp, namespaces)
 	filterReplicationControllers(rp, namespaces)
 	rp.Pods = filterPods(rp.Pods, namespaces)
-}
-
-func addResourceFromString(contents string, resources *ResourceProvider) error {
-	contentBytes := []byte(contents)
-	decoder := k8sYaml.NewYAMLOrJSONDecoder(bytes.NewReader(contentBytes), 1000)
-	resource := k8sResource{}
-	err := decoder.Decode(&resource)
-	if err != nil {
-		logrus.Errorf("Invalid YAML: %s", string(contents))
-		return err
-	}
-	decoder = k8sYaml.NewYAMLOrJSONDecoder(bytes.NewReader(contentBytes), 1000)
-	if resource.Kind == "Deployment" {
-		controller := appsv1.Deployment{}
-		err = decoder.Decode(&controller)
-		resources.Deployments = append(resources.Deployments, controller)
-	} else if resource.Kind == "StatefulSet" {
-		controller := appsv1.StatefulSet{}
-		err = decoder.Decode(&controller)
-		resources.StatefulSets = append(resources.StatefulSets, controller)
-	} else if resource.Kind == "DaemonSet" {
-		controller := appsv1.DaemonSet{}
-		err = decoder.Decode(&controller)
-		resources.DaemonSets = append(resources.DaemonSets, controller)
-	} else if resource.Kind == "Job" {
-		controller := batchv1.Job{}
-		err = decoder.Decode(&controller)
-		resources.Jobs = append(resources.Jobs, controller)
-	} else if resource.Kind == "CronJob" {
-		controller := batchv1beta1.CronJob{}
-		err = decoder.Decode(&controller)
-		resources.CronJobs = append(resources.CronJobs, controller)
-	} else if resource.Kind == "ReplicationController" {
-		controller := corev1.ReplicationController{}
-		err = decoder.Decode(&controller)
-		resources.ReplicationControllers = append(resources.ReplicationControllers, controller)
-	} else if resource.Kind == "Namespace" {
-		ns := corev1.Namespace{}
-		err = decoder.Decode(&ns)
-		resources.Namespaces = append(resources.Namespaces, ns)
-	} else if resource.Kind == "Pod" {
-		pod := corev1.Pod{}
-		err = decoder.Decode(&pod)
-		resources.Pods = append(resources.Pods, pod)
-	}
-	if err != nil {
-		logrus.Errorf("Error parsing %s: %v", resource.Kind, err)
-		return err
-	}
-	return nil
 }

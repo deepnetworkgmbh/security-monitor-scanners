@@ -166,7 +166,7 @@ spec:
         - scanners
         - --config
         - /opt/app/configs/config.yaml
-        image: 'deepnetwork/security-monitor-scanners:0.2.0'
+        image: 'deepnetwork/security-monitor-scanners:0.2.2'
         imagePullPolicy: 'Always'
         name: scanners
         ports:
