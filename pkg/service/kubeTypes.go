@@ -42,6 +42,7 @@ type ClusterSummary struct {
 	NamespacesCount int    `json:"namespaces"`
 	PodsCount       int    `json:"pods"`
 	Score           uint   `json:"score"`
+	Grade           string `json:"grade"`
 }
 
 type Check struct {
@@ -237,6 +238,50 @@ func (overview *KubeOverview) calculateSummaries() {
 	for _, v := range nsDict {
 		overview.NamespaceSummary[i] = *v
 		i++
+	}
+
+	overview.Cluster.Score = getScore(&checks)
+	overview.Cluster.Grade = getGrade(overview.Cluster.Score)
+}
+
+// getScore calculates percent of successful results. NoData checks are ignored.
+func getScore(summary *ResultSummary) uint {
+	total := (summary.Successes * 2) + summary.Warnings + (summary.Errors * 2)
+
+	if total == 0 {
+		return 100
+	}
+
+	return uint(100 * float64(summary.Successes*2) / float64(total))
+}
+
+func getGrade(score uint) string {
+	if score >= 97 {
+		return "A+"
+	} else if score >= 93 {
+		return "A"
+	} else if score >= 90 {
+		return "A-"
+	} else if score >= 87 {
+		return "B+"
+	} else if score >= 83 {
+		return "B"
+	} else if score >= 80 {
+		return "B-"
+	} else if score >= 77 {
+		return "C+"
+	} else if score >= 73 {
+		return "C"
+	} else if score >= 70 {
+		return "C-"
+	} else if score >= 67 {
+		return "D+"
+	} else if score >= 63 {
+		return "D"
+	} else if score >= 60 {
+		return "D-"
+	} else {
+		return "F"
 	}
 }
 
