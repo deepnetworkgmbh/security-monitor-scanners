@@ -47,6 +47,7 @@ type ClusterSummary struct {
 
 type Check struct {
 	Id               string      `json:"id"`
+	Description      string      `json:"description"`
 	GroupName        string      `json:"group"`
 	ResourceCategory string      `json:"category"`
 	ResourceFullName string      `json:"resourceName"`
@@ -160,8 +161,9 @@ func (overview *KubeOverview) addImageScanResults(kube *kube.ResourceProvider, i
 	for id, tag := range temp.resources {
 		if val, ok := temp.scans[tag]; ok {
 			check := Check{
-				GroupName:        "trivy.cve-scan",
+				GroupName:        "CVE Scan",
 				Id:               "trivy.cveScan",
+				Description:      val.GetScansMessage(),
 				ResourceCategory: "containers",
 				ResourceFullName: id,
 				Result:           fromTrivyToCheckResult(val.GetSeverity()),
@@ -296,8 +298,9 @@ func convertToChecks(podResult *validator.PodResult, category string, prefix str
 	for i := range podResult.Messages {
 		message := podResult.Messages[i]
 		check := Check{
-			GroupName:        fmt.Sprintf("polaris.%s", message.Category),
+			GroupName:        message.Category,
 			Id:               fmt.Sprintf("polaris.%s", message.ID),
+			Description:      message.Message,
 			ResourceCategory: category,
 			ResourceFullName: fmt.Sprintf("%s/pods", prefix),
 			Result:           fromPolarisToCheckResult(message.Type),
@@ -310,8 +313,9 @@ func convertToChecks(podResult *validator.PodResult, category string, prefix str
 		for j := range podResult.ContainerResults[i].Messages {
 			message := podResult.ContainerResults[i].Messages[j]
 			check := Check{
-				GroupName:        fmt.Sprintf("polaris.%s", message.Category),
+				GroupName:        message.Category,
 				Id:               fmt.Sprintf("polaris.%s", message.ID),
+				Description:      message.Message,
 				ResourceCategory: category,
 				ResourceFullName: fmt.Sprintf("%s/containers/%s", prefix, container.Name),
 				Result:           fromPolarisToCheckResult(message.Type),
