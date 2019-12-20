@@ -215,7 +215,7 @@ func (overview *KubeOverview) calculateSummaries() {
 		groupDict[check.GroupName].Add(check.Result)
 
 		// increment Namespace counter only for polaris check
-		if strings.HasPrefix(check.GroupName, "polaris.") {
+		if strings.HasPrefix(check.ResourceFullName, "/ns/") {
 			ns := strings.Split(check.ResourceFullName, "/")[2]
 			if _, ok := nsDict[ns]; !ok {
 				nsDict[ns] = &ResultSummary{
