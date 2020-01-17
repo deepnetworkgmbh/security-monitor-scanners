@@ -15,7 +15,7 @@ import (
 
 const (
 	// Version represents the current release version of Scanners
-	Version = "0.2.0"
+	Version = "0.2.3"
 )
 
 func main() {

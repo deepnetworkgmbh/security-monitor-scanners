@@ -1,7 +1,8 @@
+.github
+.idea
 deploy
 examples
 .gitignore
 .git/*
 Dockerfile
-LICENSE
 Tiltfile

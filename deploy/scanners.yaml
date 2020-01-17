@@ -121,7 +121,7 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: scanners
-    namespace: default
+    namespace: kubegaard
 
 ---
 apiVersion: v1
@@ -166,7 +166,7 @@ spec:
         - scanners
         - --config
         - /opt/app/configs/config.yaml
-        image: 'deepnetwork/security-monitor-scanners:0.2.2'
+        image: 'deepnetwork/security-monitor-scanners:0.2.3'
         imagePullPolicy: 'Always'
         name: scanners
         ports:
