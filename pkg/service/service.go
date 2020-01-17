@@ -158,12 +158,15 @@ func (h *Handler) getImageScanDetailsByTag(w http.ResponseWriter, r *http.Reques
 }
 
 func (h *Handler) getKubeOverview(w http.ResponseWriter, _ *http.Request) {
-	kube, err := kube.CreateResourceProviderFromCluster()
+	kubeResources, err := kube.CreateResourceProviderFromCluster()
 	if err != nil {
 		logrus.Errorf("Error creating kube provider: %v", err)
 		http.Error(w, "Error creating kube provider", 500)
 		return
 	}
+
+	imageTags := kube.GetAllImageTags(kubeResources.Pods)
+	go h.scanner.Scan(imageTags)
 
 	auditData, err := polaris.AuditKubeCluster(h.config)
 	if err != nil {
@@ -172,7 +175,7 @@ func (h *Handler) getKubeOverview(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 
-	overview := CreateKubeOverview(kube, auditData, h.scanner)
+	overview := CreateKubeOverview(kubeResources, auditData, h.scanner)
 
 	jsonHandler(w, overview)
 }
