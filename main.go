@@ -8,6 +8,7 @@ import (
 
 	conf "github.com/deepnetworkgmbh/security-monitor-scanners/pkg/config"
 	"github.com/deepnetworkgmbh/security-monitor-scanners/pkg/service"
+	"github.com/gorilla/handlers"
 	"github.com/sirupsen/logrus"
 	_ "k8s.io/client-go/plugin/pkg/client/auth" // Required for other auth providers like GKE.
 )
@@ -51,8 +52,13 @@ func main() {
 func startScannersServer(c *conf.Config, port int, basePath string) {
 	handler := service.NewHandler(c, port, basePath)
 
+	corsObj := []handlers.CORSOption{
+		handlers.AllowedOrigins([]string{"*"}),
+		handlers.AllowedMethods([]string{"GET", "POST", "OPTIONS"}),
+	}
+
 	srv := &http.Server{
-		Handler: handler.GetRouter(),
+		Handler: handlers.CORS(corsObj...)(handler.GetRouter()),
 		Addr:    fmt.Sprintf(":%d", port),
 	}
 

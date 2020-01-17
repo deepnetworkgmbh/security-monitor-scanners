@@ -252,6 +252,14 @@
   revision = "b3a23cc94cc51857a508733a0bd3d6ef0bfc16d9"
 
 [[projects]]
+  digest = "1:3e16b38456fa0dd6173c032e594cc070a0167755f5af89afcfd32ca92d7764e3"
+  name = "github.com/gorilla/handlers"
+  packages = ["."]
+  pruneopts = ""
+  revision = "8a3748addc242fc560bd6d4ff28b0374c010b1b4"
+  version = "v1.4.2"
+
+[[projects]]
   digest = "1:ec5262e6c65f9fcedc01d7789ee4e18ad429dde822cfd50e57e3fd77c4d70c73"
   name = "github.com/gorilla/mux"
   packages = ["."]
@@ -932,6 +940,7 @@
     "github.com/fairwindsops/polaris/pkg/kube",
     "github.com/fairwindsops/polaris/pkg/validator",
     "github.com/gobuffalo/packr/v2",
+    "github.com/gorilla/handlers",
     "github.com/gorilla/mux",
     "github.com/sirupsen/logrus",
     "github.com/stretchr/testify/assert",
