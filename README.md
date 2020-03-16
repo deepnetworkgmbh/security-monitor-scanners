@@ -1,5 +1,7 @@
 # Security Monitor Scanners
 
+:exclamation:**The project is ARCHIVED. We focused on [joseki](https://github.com/deepnetworkgmbh/joseki) instead**:exclamation:
+
 The project is started by Deep Network GmbH on top of [Fairwinds' Polaris](https://github.com/FairwindsOps/polaris).
 
 At the moment, it consists of three parts:
